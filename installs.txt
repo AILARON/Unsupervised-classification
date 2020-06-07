@@ -1,0 +1,34 @@
+Dependencies and goto:
+
+environment
+conda create -n <name of the environment> pip python=3.6 scikit-image
+source activate <name of the environment>
+
+
+
+###tensorflow 2.0###
+pip install tensorflow-gpu==2.0
+
+###cudnn 7.6.0###
+conda install -c anaconda cudnn=7.6
+
+###cudatoolkit###
+conda install cudatoolkit=10.0
+
+###cv2###
+pip install opencv-python
+
+###scikit learn###
+conda install scikit-learn
+
+### seaborn ###
+conda install seaborn
+
+### tqdm ###
+pip install tqdm
+
+### hdbscan ###
+conda install -c conda-forge hdbscan
+
+### psutil ###
+pip install psutil
