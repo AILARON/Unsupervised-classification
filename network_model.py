@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 from tensorflow.keras.optimizers import Adam, SGD
 
 from auto_encoder import AutoEncoder
-from sparse_autoencoder import SparseAutoEncoder
 from load_dataset import LoadDataset
 from augment_data import DataAugmentation
 from cbof import initialize_bof_layers
@@ -99,7 +98,7 @@ class NetworkModel:
             history = self.auto_encoder.fit(x = self.train_data,y = self.train_data,batch_size = 32,
             validation_data = (self.validation_data,self.validation_data),shuffle=True,
             epochs = 10,verbose= 1)
-            
+
         elif self.model_type == "FULLYCONNECTED":
             train_data= np.reshape(self.train_data,newshape  = (self.train_data.shape[0],64*64*1))
             val_data = np.reshape(self.validation_data,newshape  = (self.validation_data.shape[0],64*64*1))

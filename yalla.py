@@ -55,3 +55,111 @@ def printClasses(x,y):
 
 
     cv2.imwrite("image_of_all_noisy"+".png", outputs)
+
+"""
+Take the memory size of different models
+"""
+alloc = False
+if alloc == True:
+    pid = None
+    import psutil
+
+    process = psutil.Process(os.getpid())
+    #print(process.memory_info().rss)  # in bytes
+    train_data = LoadDataset("dataset/kaggle_original_train/",0)
+    train_data, train_label, val, val_label = train_data.load_data()
+
+
+    #tracemalloc.start()
+
+    #test_vae()
+    model_type = "COAPNET"
+    latent_vector = "globalAverage"
+    model = buildNetwork(model_type, latent_vector,latent_dim = 64, epochs = 1,train = False,noisy = False)
+
+
+    auto, enc, pre = model.getModel()
+    #train_data= np.reshape(train_data,newshape  = (train_data.shape[0],64*64*1))
+    enc_output = enc.predict(train_data)
+    print(process.memory_info())  # in bytes
+
+def make_confusion_SC():
+    """
+    Fix confusion matrix so that true and predicted class both have same label
+    """
+    y_pred  = np.zeros(3720)
+    y_true = np.zeros(3720)
+    for i in range(3720):
+        if i < 4:
+            y_true[i] = 0
+            y_pred[i] = 4
+        if i < 4 + 505:
+            y_true[i] = 0
+            y_pred[i] = 0
+    j = 0
+    for i in range(509,1180):
+        if j < 203:
+            y_true[i] = 1
+            y_pred[i] = 4
+        elif j < 203 + 3:
+            y_true[i] = 1
+            y_pred[i] = 0
+        elif j < 203 + 3+ 4:
+            y_true[i] = 1
+            y_pred[i] = 3
+        elif j < 203 + 3+ 4 + 461:
+            y_true[i] = 1
+            y_pred[i] = 1
+        j += 1
+
+    j = 0
+    for i in range(1180,1681):
+        if j < 87:
+            y_true[i] = 2
+            y_pred[i] = 4
+        elif j < 87 + 185:
+            y_true[i] = 2
+            y_pred[i] = 0
+        elif j < 87 + 185 +75:
+            y_true[i] = 2
+            y_pred[i] = 3
+        elif j < 87 + 185 +75 +28 :
+            y_true[i] = 2
+            y_pred[i] = 1
+        elif j < 87 + 185 +75 +28 + 126:
+            y_true[i] = 2
+            y_pred[i] = 2
+        j += 1
+    j = 0
+    for i in range(1681,2843):
+        if j < 123:
+            y_true[i] = 3
+            y_pred[i] = 4
+        elif j < 123 + 37:
+            y_true[i] = 3
+            y_pred[i] = 0
+        elif j < 112 + 37 +995:
+            y_true[i] = 3
+            y_pred[i] = 3
+        elif j < 112 + 37 +995 +7 :
+            y_true[i] = 3
+            y_pred[i] = 1
+        j += 1
+    j = 0
+    for i in range(2843,3720):
+        if j < 828:
+            y_true[i] = 4
+            y_pred[i] = 4
+        elif j < 828 + 43:
+            y_true[i] = 4
+            y_pred[i] = 0
+        elif j < 828 + 43 +3 :
+            y_true[i] = 4
+            y_pred[i] = 3
+        elif j < 828 + 43 +3 +3  :
+            y_true[i] = 4
+            y_pred[i] = 1
+
+        j += 1
+
+    confusion_matrix(y_true,y_pred, save_name = "testlitestSC.png")
