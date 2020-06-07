@@ -6,4 +6,3 @@ This is the code base of Eivind Salvesens specialization project in unsupervised
 # Dependecies
 Check installs.txt file
 
-# Files
