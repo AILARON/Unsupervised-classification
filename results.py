@@ -13,7 +13,7 @@ from load_dataset import LoadDataset
 
 from utils import visualize_input_output,kernel_inspection,visualize_class_activation_map,visualize_activation_map,confusion_matrix,visualize_class_predictions,accuracy
 
-from clustering_algorithms import HierarchicalClustering, KMeansClustering,TSNEAlgo
+from clustering_algorithms import HierarchicalClustering, KMeansCluster,TSNEAlgo
 from sklearn.cluster import SpectralClustering
 #Dataset paths
 

@@ -32,3 +32,6 @@ conda install -c conda-forge hdbscan
 
 ### psutil ###
 pip install psutil
+
+### opencv-contrib ###
+pip install opencv-contrib-python

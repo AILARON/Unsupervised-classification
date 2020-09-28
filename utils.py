@@ -98,7 +98,7 @@ def tile_scatter(x, input_data,colors,save_name, save_data_dir):
 
     for img, x, y, c in tqdm(zip(input_data, tx, ty, colors)):
         #tile = Image.open(img).convert('RGB')
-        tile = Image.fromarray(np.uint8(img * 255)).convert('RGB')
+        tile = Image.fromarray(np.uint8(img)).convert('RGB') #Image.fromarray(np.uint8(img * 255)).convert('RGB')
         rs = max(1, tile.width / max_dim, tile.height / max_dim)
         tile = tile.resize((max(1, int(tile.width / rs)), max(1, int(tile.height / rs))), Image.ANTIALIAS)
 
@@ -117,6 +117,48 @@ def tile_scatter(x, input_data,colors,save_name, save_data_dir):
     plt.savefig(os.path.join(save_data_dir, save_name+'_image.png'))
     plt.close()
     return
+
+
+def visualize_input(image_data, name ="name"):
+    #cv2.imwrite(name+".png",image_data)
+    #return
+    output = "4x4"
+    if output == "4x4":
+        hstack = None
+        vstack = None
+        for i in range (4):
+            hstack = None
+            for j in range (4):
+                print(i*4 +j)
+                original = image_data[i*4 +j] *255 #+239
+                if hstack is None:
+                    hstack = original
+                else:
+                    hstack = np.hstack([hstack, original])
+            if vstack is None:
+                vstack = hstack
+            else:
+                vstack = np.vstack([vstack, hstack])
+        cv2.imwrite(name+".png",vstack)
+        #im = Image.fromarray(vstack)
+        #im.save('name.jpg', format='JPEG', quality=100)
+        return
+
+    outputs = None
+    for i in range(0, min(10, len(image_data))):
+        # retrieve one original image and its recovered counterpart
+    	original = image_data[i] #*255) .astype("uint8")
+
+    	# if the outputs array is empty, initialize it as the current
+    	if outputs is None:
+    		outputs = original
+
+    	# otherwise, vertically stack the outputs
+    	else:
+    		outputs = np.vstack([outputs, original])
+
+    #save to file
+    cv2.imwrite(name+".png",outputs)
 
 
 def visualize_input_output(model,image_data,name ="name"):
@@ -380,6 +422,7 @@ def accuracy(y,y_pred):
     for i in range(y_pred.size):
         w[y_pred[i], y_true[i]] += 1
     ind = linear_assignment(-w)
+
     acc = sum([w[i, j] for i, j in ind]) * 1.0 / y_pred.size
     print("ACC = ",acc)
     return acc

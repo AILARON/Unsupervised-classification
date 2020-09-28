@@ -1,7 +1,7 @@
 #########################################################
 #                    Main function                      #
 #                                                       #
-#Created by Eivind Salvesen                             #
+#               Created by Eivind Salvesen              #
 #########################################################
 
 import os
@@ -14,6 +14,8 @@ from load_dataset import LoadDataset
 from augment_data import DataAugmentation
 from network_model import NetworkModel
 from results import getNetworkResults
+
+from deep_cluster import DeepCluster
 
 #Set up GPU
 gpu = 1
@@ -69,10 +71,93 @@ def buildNetwork(model_type,latent_vector,latent_dim = 10, epochs = 10,train = T
     return model
 
 
+def get_label(file_path, classes):
+    parts = file_path.split('/')
+    return parts[-2] == classes
+
+def test():
+    import os
+    import csv
+    import pathlib
+    print("sad")
+    print(pathlib.Path("dataset/kaggle_original_train/").glob('*/*.jpg'))
+    import glob
+
+    # Returns a list of names in list files.
+    print("Using glob.glob()")
+    files = glob.glob('dataset/kaggle_original_train//**/*.jpg',
+                       recursive = True)
+
+    filepath = pathlib.Path("dataset/kaggle_original_train/")
+
+    data = []
+    classes = np.array([item.name for item in filepath.glob('*') if item.name != "test"])
+    print(classes)
+    for file in files:
+        #print(file)
+        #parts = file.split('/')
+
+        label = np.where(get_label(file,classes))[0]
+        print(label)
+
+        #print(parts[-2])
+
+        data.append([file,label])
+    #print(data)
+
+    import csv
+    #self.CLASS_NAMES = np.array([item.name for item in self.data_dir.glob('*') if item.name != "test"])
+    #np.where(label.numpy())[0]
+
+    with open('test.csv', 'w') as file:
+        writer = csv.writer(file)
+        writer.writerow(["id","label"])
+        for d in data:
+            writer.writerow(d)
+
+
+    #parts = tf.strings.split(file_path, '/')
+    #return parts[-2] == self.CLASS_NAMES
+
+
+def test2():
+    import pandas as pd
+    df=pd.read_csv(r"output.csv")
+    df.columns = ['id',"label"]
+    print(df.head())
+
+    datagen= tf.keras.preprocessing.image.ImageDataGenerator(rescale=1./255)
+    train_generator=datagen.flow_from_dataframe(dataframe=df, directory="", x_col="id", y_col="label", class_mode="categorical", target_size=(32,32), batch_size=32)
+
 if __name__=="__main__":
     tf.keras.backend.clear_session()
+    #test()
+    #test2()
+    #os.exit()
 
-    model = "auto"
+    model = "DM"
+
+    if model == "data_statistics":
+        from get_dataset_info import data_info
+        data_info().data_statistics()
+
+    if model == "traditionalExtraction":
+        from traditional_extraction import traditionalExtraction
+        traditionalExtraction()
+
+    if model == "neuralNetwork":
+        from baseline import neuralNetwork
+
+        neuralNetwork(1)
+        #for i in range(3):
+        #    neuralNetwork(i)
+
+    if model == "DM":
+        #train_data = LoadDataset("dataset/kaggletrainoriginalfull/",0,False)
+        #train_data, train_label, val, val_label = train_data.load_data()
+        model = DeepCluster()
+        #for i in range(3):
+        model.new_train(1)
 
 
     if model == "auto":

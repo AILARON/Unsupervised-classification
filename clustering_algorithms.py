@@ -26,12 +26,21 @@ from sklearn.manifold import TSNE
 from utils import fashion_scatter, color_list, tile_scatter
 from sklearn.preprocessing import StandardScaler
 
+#SpectralClustering
+from sklearn.cluster import SpectralClustering
+
+#PCA
+from sklearn.decomposition import PCA
+
 class HierarchicalClustering():
     '''
     HierarchicalClustering Algorithm
     Deduces the cut-off distance from the dendogram = median distances + 2 * std of distances
     The algorithm suggests the number of clusters based on the cut-off distance
     '''
+
+    model = None
+
     def fancy_dendrogram(self, *args, **kwargs):
         '''
         Apply some fancy visualizations on the dendrogram of the hierarchical clustering
@@ -76,7 +85,7 @@ class HierarchicalClustering():
 
         print('Z[-4:, 2]', Z[-4:, 2])
         print('', Z[:, 2])
-        max_d = 58#np.median(Z[:, 2]) + 2 * np.std(Z[:, 2])
+        max_d = 20000 #np.median(Z[:, 2]) + 2 * np.std(Z[:, 2])
 
         # calculate full dendrogram
         plt.figure(figsize=(25, 10))
@@ -92,11 +101,11 @@ class HierarchicalClustering():
             leaf_font_size=12.,
             show_contracted=True,
             annotate_above=0.05,  # useful in small plots so annotations don't overlap
-            max_d=max_d,  # plot a horizontal cut-off line
+            max_d= max_d,  # plot a horizontal cut-off line
             title=title
         )
         plt.savefig(savetitle)
-        k = 8
+        k = 5
         clusters = fcluster(Z, max_d, criterion='distance') #maxclust
         n_clusters = len(np.unique(clusters))
         print(np.unique(clusters))
@@ -107,6 +116,12 @@ class HierarchicalClustering():
         print(np_clusters)
 
         return np_clusters
+
+    """def fit_predict(self,test_x):
+        # generate the linkage matrix
+        Z = linkage(X, 'ward')
+        clusters = fcluster(Z, max_d, criterion='distance') #maxclust
+        return"""
 
 class ClusterAlgorithm:
     model = None
@@ -153,11 +168,13 @@ class ClusterAlgorithm:
 
     pass
 
-class KMeansClustering(ClusterAlgorithm):
+class KMeansCluster(ClusterAlgorithm):
     n_clusters = 5
-    n_init = 100
+    n_init = 1000
 
-    def __init__(self):
+    def __init__(self,n_clusters = 5, n_init = 100):
+        self.n_clusters = n_clusters
+        self.n_init = n_init
         self.build_model()
 
     def build_model(self):
@@ -177,6 +194,31 @@ class KMeansClustering(ClusterAlgorithm):
         return self.model.predict(X)
     pass
 
+class SpectralCluster(ClusterAlgorithm):
+    n_clusters = 5
+    n_init = 1000
+
+    def __init__(self,n_clusters = 5, n_init = 1000):
+        self.n_clusters = n_clusters
+        self.n_init = n_init
+        self.build_model()
+
+    def build_model(self):
+        '''
+        Build the model
+        :return: model
+        '''
+        self.model = SpectralClustering(n_clusters=self.n_clusters, affinity='nearest_neighbors',
+                                   assign_labels='kmeans')
+
+    def fit(self, X):
+        return self.model.fit(X)
+
+    def predict(self, X):
+        return self.model.fit_predict(X)
+    pass
+
+
 class TSNEAlgo():
     tsne = None
     def __init__(self):
@@ -195,7 +237,7 @@ class TSNEAlgo():
         imgHeight = 64
         imgWidth = 64
         imgNumber = len(input_data)
-        input_data = np.reshape(input_data,(imgNumber,imgHeight,imgWidth))
+        #input_data = np.reshape(input_data,(imgNumber,imgHeight,imgWidth))
 
 
         ## -- drawing the scatterplot from TSNE
@@ -203,5 +245,34 @@ class TSNEAlgo():
 
         ## -- drawing the full images on TSNE
         tile_scatter(self.tsne, input_data,labels,save_name,save_data_dir)
+
+        return
+
+class PCAAlgo():
+    pca = None
+    def __init__(self):
+        return
+
+    def pca_fit(self, X):
+        x = StandardScaler().fit_transform(X)
+        #time_start = time()
+        RS = 123
+        self.pca = PCA(n_components=2,copy=True, svd_solver='auto',
+        iterated_power='auto').fit_transform(x)
+
+        return
+
+    def pca_plot(self, input_data, labels, save_name = "pca", save_data_dir = "pca_plot"):
+        imgHeight = 64
+        imgWidth = 64
+        imgNumber = len(input_data)
+        #input_data = np.reshape(input_data,(imgNumber,imgHeight,imgWidth))
+
+
+        ## -- drawing the scatterplot from TSNE
+        fashion_scatter(self.pca, labels, save_name,save_data_dir)
+
+        ## -- drawing the full images on TSNE
+        tile_scatter(self.pca, input_data,labels,save_name,save_data_dir)
 
         return
