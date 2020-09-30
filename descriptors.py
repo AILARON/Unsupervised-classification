@@ -77,13 +77,17 @@ class Descriptor:
 
         #convert image to uint8
         #cvuint8 = cv2.convertScaleAbs(self.image)
-        cv8 = (self.image * 255).astype("uint8")
+
+        #### USED WHEN KAGGLE DATA#####
+        #cv8 = (self.image * 255).astype("uint8")
+
+
         #from utils import visualize_input
         #visualize_input(cv8)
 
-        kp, desc = sift.detectAndCompute(cv8, None)
+        kp, desc = sift.detectAndCompute(self.image, None)
 
-        img = cv2.drawKeypoints(cv8, kp, None, (0, 0, 255), flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+        img = cv2.drawKeypoints(self.image, kp, None, (0, 0, 255), flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
 
         if desc is None:
             print('None Object descriptor!!')

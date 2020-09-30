@@ -85,7 +85,7 @@ class HierarchicalClustering():
 
         print('Z[-4:, 2]', Z[-4:, 2])
         print('', Z[:, 2])
-        max_d = 20000 #np.median(Z[:, 2]) + 2 * np.std(Z[:, 2])
+        max_d = 60000 #np.median(Z[:, 2]) + 2 * np.std(Z[:, 2])
 
         # calculate full dendrogram
         plt.figure(figsize=(25, 10))

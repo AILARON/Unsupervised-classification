@@ -9,6 +9,12 @@
 # funded by RCN FRINATEK IKTPLUSS program (project number 262701) and supported by NTNU AMOS
 #
 #################################################################################################################
+
+
+######
+#RUN USING SIFTSURFENV
+######
+
 import numpy as np
 from descriptors import Descriptor, BFMatcher
 
@@ -16,10 +22,10 @@ from clustering_algorithms import *
 
 import tensorflow as tf
 import scipy.spatial.distance as ssd
-from load_dataset import importKaggleTest
+from load_dataset import importKaggleTest, importAilaronTest
 import cv2
 
-def calculate_distances(input_data, desc ='SIFT'):
+def calculate_distances(input_data, desc ='SIFT', image_type = "rgb"):
     desc_len = 64       # SURF descriptor length
     if desc == 'SIFT':
         desc_len = 128
@@ -27,13 +33,22 @@ def calculate_distances(input_data, desc ='SIFT'):
     X_desc = []
     temp = []
     for image in input_data: #.iloc[:, 0]:
-        print(image)
+        #print(image)
         #image = Image(x).image_read(resize=False)
-        img = np.float64(image) / np.max(image)
-        #img = image.astype('float32')
-        img = image.reshape(64,64)
+
+
+        #img = np.float64(image) / np.max(image)
+        #img = image.astype(np.float32)
+
+        #reshape
+        if image_type == "rgb":
+            img = image.reshape(64,64,3)
+        elif image_type == "bw":
+            img = image.reshape(64,64)
+
         #print(img.dtype)
         #print(img.shape)
+
         #temp.append(img)
         img_, _, fd = Descriptor(desc, img).algorithm(desc)
         X_desc = np.append(X_desc, None)  # Allocate space for your new array
@@ -95,18 +110,28 @@ def calculate_hog_distances(input_data, desc ='HOG'):
     return X, X_hog
 
 
-def traditionalExtraction(exct = 0):
+def traditionalExtraction(exct = 1):
     extractor_types = ["SIFT","SURF","HOG"]
     extractor_method = extractor_types[exct]
 
     #Import data
-    input_data, input_labels = importKaggleTest()
+    #input_data, input_labels = importKaggleTest(depth=1)
+    input_data, input_labels = importAilaronTest(depth=1)
+    print(input_labels)
+    #Resize images
+    #input_data = np.array([cv2.resize(img, dsize=(64,64), interpolation=cv2.INTER_LINEAR) for img in (input_data)], dtype=np.uint8) #, dtype=np.uint8 SURF
+
+    #resize and normalize
+    input_data = np.array([cv2.resize(cv2.normalize(img, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX), dsize=(64,64), interpolation=cv2.INTER_LINEAR) for img in (input_data)], dtype=np.uint8) #, dtype=np.uint8 SURF
+
+
     input_data_center = input_data - input_data.mean()
+
     #input_data = input_data[:1000,:,:]
 
 
     if extractor_method == "SIFT":
-        X_I, X_SIFT, img = calculate_distances(input_data, desc='SIFT')
+        X_I, X_SIFT, img = calculate_distances(input_data, desc='SIFT', image_type = "rgb")
 
         #Visualize sift key points
         printImages(img,name=extractor_method)
@@ -121,17 +146,17 @@ def traditionalExtraction(exct = 0):
 
 
     elif extractor_method == "SURF":
-        X_U, X_SURF = calculate_distances(input_data, desc='SURF')
+        X_U, X_SURF, img = calculate_distances(input_data, desc='SURF', image_type = "rgb")
 
         #Visualize sift key points
         printImages(img,name=extractor_method)
 
         #Calculate and print cluster results
-        clusterResults(extractor_method,X_I, X_SIFT, input_labels)
+        clusterResults(extractor_method,X_U, X_SURF, input_labels)
 
         labels_sift = \
             HierarchicalClustering() \
-                    .draw_dendogram(X_SIFT,
+                    .draw_dendogram(X_SURF,
                                 title='Hierarchical Clustering Dendrogram of the SIFT Descriptors')
 
     #Get features from deep neural network for better visualization
@@ -139,7 +164,7 @@ def traditionalExtraction(exct = 0):
 
     #Make TSNE plot using sift descriptors and predicted sift labels
     tsne = TSNEAlgo()
-    tsne.tsne_fit(X_I,perplexity=35)
+    tsne.tsne_fit(X_U,perplexity=35)
     tsne.tsne_plot(input_data, labels_sift, extractor_method,extractor_method)
 
     #Make TSNE plots using features from deep network, predicted sift labels and true labels
@@ -153,69 +178,6 @@ def traditionalExtraction(exct = 0):
     #X_U, X_SURF = calculate_distances(input_data, desc='SURF')
     #X, X_hog = calculate_hog_distances(input_data, desc='HOG')
     print('------------------------------------------')
-    """
-    # Hierarchical Clustering
-    labels = HierarchicalClustering()\
-        .draw_dendogram(X,
-                        title='Hierarchical Clustering Dendrogram')
-    #labels = MeanShiftAlgo().meanshift_fit(X)
-    #PrincipleComponentAnalysis().pca_fit(labels,X)
-    TSNEAlgo().tsne_fit(X, input_data, labels)
-
-    labels_hog = \
-        HierarchicalClustering()\KMeansCluster
-            .draw_dendogram(X_hog,
-                            title='Hierarchical Clustering Dendrogram of the HOG Descriptors')
-    #labels = MeanShiftAlgo().meanshift_fit(X_hog)
-    #PrincipleComponentAnalysis().pca_fit(labels_hog, X_hog)
-    TSNEAlgo().tsne_fit(X_hog, input_data, labels_hog, title='HOG Descriptors TSNE Representation')
-    TSNEAlgo().tsne_fit(X, input_data, labels_hog, title='HOG Labeled TSNE Representation')
-    """
-    """labels_sift = \
-        HierarchicalClustering() \
-                .draw_dendogram(X_SIFT,
-                            title='Hierarchical Clustering Dendrogram of the SIFT Descriptors')
-
-    #print(X_SIFT)
-    #labels_sift = KMeansCluster().fit(X_I).predict(X_I)
-
-
-
-    print(X_I.shape)
-    print(input_data.shape)
-    print(labels_sift.shape)
-
-
-    #Print a 4x4 image array
-    printImages(img)
-
-
-    #Get features from deep neural network for better visualization
-    features = extractDeepFeatures(input_data_center)
-
-    #Make TSNE plot using sift descriptors and predicted sift labels
-    tsne = TSNEAlgo()
-    tsne.tsne_fit(X_I,perplexity=35)
-    tsne.tsne_plot(input_data, labels_sift, "SIFT","SIFT")
-
-    #Make TSNE plots using features from deep network, predicted sift labels and true labels
-    tsne = TSNEAlgo()
-    tsne.tsne_fit(features,perplexity=35)
-    tsne.tsne_plot(input_data, data_y, "SIFT_COAP_TRUE","SIFT")
-    tsne.tsne_plot(input_data, labels_sift,"SIFT_COAP_PRED","SIFT")
-    """
-    """
-    labels_surf = \
-        HierarchicalClustering() \
-            .draw_dendogram(X_SURF,
-                            title='Hierarchical Clustering Dendrogram of the SURF Descriptors')
-    TSNEAlgo().tsne_fit(X_U, input_data, labels_surf, title='SURF Descriptors TSNE Representation')
-    TSNEAlgo().tsne_fit(X, input_data, labels_surf, title='SURF Labeled TSNE Representation')"""
-
-
-
-
-
 
     return
 
@@ -229,11 +191,11 @@ def extractDeepFeatures(input_data):
     model.compile(optimizer=optimizer, loss=tf.keras.losses.CategoricalCrossentropy(), metrics=['accuracy'])
 
     #Make dataset 3 dimensional
-    train_data_3d=np.stack([input_data]*3, axis=-1)
-    train_data_3d = train_data_3d.reshape(-1, 64,64,3)
+    #train_data_3d=np.stack([input_data]*3, axis=-1)
+    #train_data_3d = train_data_3d.reshape(-1, 64,64,3)
 
     #Make tensorflow dataset
-    visualize_dataset = tf.data.Dataset.from_tensor_slices((train_data_3d))
+    visualize_dataset = tf.data.Dataset.from_tensor_slices(input_data)
     visualize_dataset = visualize_dataset.batch(32)
 
     #Remove softmax layer
@@ -245,13 +207,17 @@ def extractDeepFeatures(input_data):
 
     return features
 
+import random
+
+
 def printImages(image_data, name ="name"):
     hstack = None
     vstack = None
     for i in range (4):
         hstack = None
         for j in range (4):
-            original = image_data[i*4 +j]
+
+            original = image_data[random.randint(0, 7000)] #*255#image_data[i*4 +j]
             if hstack is None:
                 hstack = original
             else:
@@ -261,19 +227,21 @@ def printImages(image_data, name ="name"):
         else:
             vstack = np.vstack([vstack, hstack])
     cv2.imwrite(name+".png",vstack)
+
     return
 
+from utils import confusion_matrix
 def clusterResults(extractor, desc,dist, input_labels):
 
     if extractor =="SIFT":
         #Predict using K-means
-        kmean = KMeansCluster()
+        kmean = KMeansCluster(n_clusters = 7)
         kmean.fit(desc)
         k_means_labels  = sortLabels(input_labels,kmean.predict(desc))
         kmean.performance(input_labels,k_means_labels)
-
+        confusion_matrix(input_labels,k_means_labels, save_name = "confusion_matrix_kmean.png")
         #Predict using SpectralClustering
-        spectral = SpectralCluster()
+        spectral = SpectralCluster(n_clusters = 7)
         spectral_labels  = sortLabels(input_labels,spectral.predict(desc))
         spectral.performance(input_labels,spectral_labels)
 
@@ -322,7 +290,8 @@ def clusterResults(extractor, desc,dist, input_labels):
     return
 
 def sortLabels(y_true,y_pred):
-    from sklearn.utils.linear_assignment_ import linear_assignment
+    #from sklearn.utils.linear_assignment_ import linear_assignment
+    from scipy.optimize import linear_sum_assignment as linear_assignment
 
     y_true = y_true.astype(np.int64)
     y_pred = y_pred.astype(np.int64)
@@ -336,6 +305,6 @@ def sortLabels(y_true,y_pred):
 
     new_pred = np.zeros(len(y_pred), dtype=np.int64)
     for i in range(len(y_pred)):
-        new_pred[i] = ind[y_pred[i]][1]
+        new_pred[i] = ind[1][y_pred[i]]
 
     return new_pred
