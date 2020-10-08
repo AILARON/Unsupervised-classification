@@ -86,13 +86,13 @@ class Preprocessing():
         self.label = label
 
         from utils import visualize_input
-        visualize_input(data[0:16])
+        #visualize_input(data[0:16])
 
         print('Data min=%.3f, max=%.3f' % (data.min(), data.max()))
 
     def returnAugmentedDataset(self):
         ImageDataGenerator = tf.keras.preprocessing.image.ImageDataGenerator(**DATA_GEN_ARGS)
-        
+
 
         gen = ImageDataGenerator.flow(
             self.data,
@@ -122,34 +122,62 @@ class Preprocessing():
         self.label = label
 
 class PreprocessingFromDataframe(Preprocessing):
+    predictgen = None
+    traingen = None
 
-    def __init__(self,dataset='Kaggle', num_classes = 121):
+
+    def __init__(self,data, label,dataset='Kaggle', num_classes = 121):
             self.DATASET = dataset
             self.NUM_CLASSES = num_classes
+            self.IMAGE_WIDTH = 224
+            self.IMAGE_HEIGHT = 224
+
 
             if dataset == 'Ailaron':
                 self.IMAGE_WIDTH = 64
                 self.IMAGE_HEIGHT = 64
                 self.IMAGE_DEPTH = 3
                 self.NUM_CLASSES = 7
-
+            self.createPreprocessedGenerators(data)
             return
+
+    def createPreprocessedGenerators(self,data):
+        self.predictgen= tf.keras.preprocessing.image.ImageDataGenerator(rescale=1./255,
+        featurewise_center	= True,
+        )
+
+        self.traingen= tf.keras.preprocessing.image.ImageDataGenerator(rescale=1./255,
+        featurewise_center	= True,
+        rotation_range=90,
+        width_shift_range=0.1, #0,1
+        height_shift_range=0.1, #0,1
+        zoom_range=0.2, #0,2
+        #UNDER WAS ADDED LAST
+        horizontal_flip = True,
+        vertical_flip = True)
+
+        data = np.array([cv2.resize(img, dsize=(self.IMAGE_WIDTH,self.IMAGE_HEIGHT), interpolation=cv2.INTER_LINEAR) for img in (data)])
+        #data=np.stack([data]*3, axis=-1)
+        data = data.reshape(-1, self.IMAGE_WIDTH,self.IMAGE_HEIGHT,1)
+
+        self.predictgen.fit(data)
+        self.traingen.fit(data)
+
     def createPreprocessedDataset(self):
         import pandas as pd
         df=pd.read_csv(r"output.csv")
-        #df.columns = ['id',"label"]
-        print(df.head())
 
-        datagen= tf.keras.preprocessing.image.ImageDataGenerator(rescale=1./255)
-        train_generator=datagen.flow_from_dataframe(dataframe=df, directory="", x_col="id", y_col="label", class_mode="categorical",
-        target_size=(224,224), batch_size=32, shuffle=False)
+        train_generator= self.predictgen.flow_from_dataframe(dataframe=df, directory="", x_col="id", y_col="label", class_mode="categorical",
+        target_size=(self.IMAGE_WIDTH,self.IMAGE_HEIGHT), batch_size=32, shuffle=False, color_mode='rgb', interpolation = "bilinear")
+
 
         # Wrap the generator with tf.data
         ds = tf.data.Dataset.from_generator(
             lambda: train_generator,
             output_types=(tf.float32, tf.float32),
-            output_shapes = ([None, self.IMAGE_WIDTH,self.IMAGE_HEIGHT,self.IMAGE_DEPTH],[None,self.NUM_CLASSES])
+            output_shapes = ([None, self.IMAGE_WIDTH,self.IMAGE_HEIGHT,3],[None,self.NUM_CLASSES])
         )
+
         return ds
 
     def createPreprocessedAugmentedDataset(self):
@@ -158,22 +186,16 @@ class PreprocessingFromDataframe(Preprocessing):
         #df.columns = ['id',"label"]
         print(df.head())
 
-        datagen= tf.keras.preprocessing.image.ImageDataGenerator(rescale=1./255,rotation_range=90,
-        width_shift_range=0.1, #0,1
-        height_shift_range=0.1, #0,1
-        zoom_range=0.2, #0,2
-        #UNDER WAS ADDED LAST
-        horizontal_flip = True,
-        vertical_flip = True)
 
-        train_generator=datagen.flow_from_dataframe(dataframe=df, directory="", x_col="id", y_col="label", class_mode="categorical",
-        target_size=(224,224), batch_size=32, shuffle =True)
+
+        train_generator=self.traingen.flow_from_dataframe(dataframe=df, directory="", x_col="id", y_col="label", class_mode="categorical",
+        target_size=(self.IMAGE_WIDTH,self.IMAGE_HEIGHT), batch_size=32, shuffle =True, color_mode='rgb', interpolation = "bilinear")
 
         # Wrap the generator with tf.data
         ds = tf.data.Dataset.from_generator(
             lambda: train_generator,
             output_types=(tf.float32, tf.float32),
-            output_shapes = ([None, self.IMAGE_WIDTH,self.IMAGE_HEIGHT,self.IMAGE_DEPTH],[None,self.NUM_CLASSES])
+            output_shapes = ([None, self.IMAGE_WIDTH,self.IMAGE_HEIGHT,3],[None,self.NUM_CLASSES])
         )
         return ds
 
@@ -191,22 +213,49 @@ class PreprocessingFromDataframe(Preprocessing):
         labels = np.array(labels)
 
 
-
-        datagen= tf.keras.preprocessing.image.ImageDataGenerator(rescale=1./255)
-        train_generator=datagen.flow_from_dataframe(dataframe=df, directory="", x_col="id", y_col="label",
-         class_mode="categorical",color_mode='grayscale',target_size=(224,224), batch_size=32, shuffle=False)
+        train_generator= self.predictgen.flow_from_dataframe(dataframe=df, directory="", x_col="id", y_col="label", class_mode="categorical",
+        target_size=(self.IMAGE_WIDTH,self.IMAGE_HEIGHT), batch_size=32, shuffle=False, color_mode='rgb', interpolation = "bilinear")
 
         # Wrap the generator with tf.data
         ds = tf.data.Dataset.from_generator(
             lambda: train_generator,
             output_types=(tf.float32, tf.float32),
-            output_shapes = ([None, self.IMAGE_WIDTH,self.IMAGE_HEIGHT,1],[None,5])
+            output_shapes = ([None, self.IMAGE_WIDTH,self.IMAGE_HEIGHT,3],[None,5])
         )
-
-
 
         return ds, labels
 
+    def returnImages(self):
+        import pandas as pd
+        from PIL import Image
+
+        df=pd.read_csv(r"test.csv")
+        #df.columns = ['id',"label"]
+        #print(df.head())
+        images = []
+        ds = np.zeros((3720,64,64))
+        for index, row in df.iterrows():
+            img = np.array(Image.open(row['id']),dtype=np.float32)
+            images.append(img)
+
+        data = np.array([cv2.resize(img, dsize=(64,64), interpolation=cv2.INTER_LINEAR) for img in (images)])
+
+        return data
+
+    def returnLabels(self):
+        import pandas as pd
+        df=pd.read_csv(r"truelabels.csv")
+        #df.columns = ['id',"label"]
+        print(df.head())
+
+        labels = []
+        df2 = df.iloc[:, 1]
+        list = df2.to_numpy()
+        for val in list:
+            labels.append(int(val[1]))
+        labels = np.array(labels)
+
+        return labels
 
 """
     def createPreprocessedDatasetasa(self, val_data,val_label):

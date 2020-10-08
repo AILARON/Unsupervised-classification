@@ -5,19 +5,60 @@
 import tensorflow as tf
 
 
+from cbof import BoF_Pooling
 
 
+def BOF_MODELS(input_shape = (64,64,3),output_shape = 121,backbone = "coapnet"):
+    if backbone == "coapnet":
+        model = COAPNET(input_shape = (64,64,3),output_shape = 121, include_top = False)
+        bof = BoF_Pooling(256, spatial_level=1)(model.output)
+        x = tf.keras.layers.Dense(512, activation='relu')(bof)
+        x = tf.keras.layers.Dense(1024, activation='relu')(x)
+        x = tf.keras.layers.Dense(256)(x)
+        x = tf.keras.layers.Activation('relu')(x)
+        x = tf.keras.layers.Dense(output_shape, activation='softmax')(x)
 
+        return tf.keras.models.Model(model.input, x,name="COAPNET")
+    if backbone == "vgg":
+        model = VGG_BATCHNORM(input_shape = (64,64,3),output_shape = 121, include_top = False)
+        bof = BoF_Pooling(256, spatial_level=1)(model.output)
+        x = tf.keras.layers.Dense(4096, activation='relu')(bof)
+        x = tf.keras.layers.Dense(4096)(x)
+        x = tf.keras.layers.Activation('relu')(x)
+        x = tf.keras.layers.Dense(output_shape, activation='softmax')(x)
+
+        return tf.keras.models.Model(model.input, x,name="VGG16")
+
+
+def RESNET50(input_shape = (64,64,3),output_shape = 121, include_top = True):
+    #model= tf.keras.applications.ResNet101V2(include_top=True,weights=None, classes = 7)
+    model= tf.keras.applications.ResNet50V2(include_top=False,weights=None)
+    if include_top == False:
+        return tf.keras.models.Model(inputs=model.input,
+                           outputs=model.output, name="RESNET50")
+    else:
+        #add top layer
+        layer =tf.keras.layers.GlobalAveragePooling2D()(model.output)
+        layer = tf.keras.layers.Dense(output_shape, activation='softmax')(layer)
+        model = tf.keras.models.Model(inputs=model.input,
+                           outputs=layer, name="RESNET50")
+        return model
 #RESNET
-def RESNET101(input_shape = (64,64,3),output_shape = 121):
+def RESNET101(input_shape = (64,64,3),output_shape = 121, include_top = True):
     #model= tf.keras.applications.ResNet101V2(include_top=True,weights=None, classes = 7)
     model= tf.keras.applications.ResNet101V2(include_top=False,weights=None)
-    #add top layer
-    layer =tf.keras.layers.GlobalAveragePooling2D()(model.output)
-    layer = tf.keras.layers.Dense(output_shape, activation='softmax')(layer)
-    model = tf.keras.models.Model(inputs=model.input,
-                       outputs=layer, name="RESNET101")
-    return model
+
+    if include_top == False:
+        return tf.keras.models.Model(inputs=model.input,
+                           outputs=model.output, name="RESNET101")
+    else:
+        #add top layer
+        layer =tf.keras.layers.GlobalAveragePooling2D()(model.output)
+        layer = tf.keras.layers.Dense(output_shape, activation='softmax')(layer)
+        model = tf.keras.models.Model(inputs=model.input,
+                           outputs=layer, name="RESNET101")
+        return tf.keras.models.Model(inputs=model.input,
+                           outputs=layer, name="RESNET101")
 
 #VGG16
 def VGG(input_shape=(224,224,3),output_shape = 121):
@@ -31,7 +72,7 @@ def VGG(input_shape=(224,224,3),output_shape = 121):
     vgg = tf.keras.models.Model(inputs, x,name="VGG16")
     return model
 
-def VGG_BATCHNORM(input_shape=(64,64,3),output_shape = 121):
+def VGG_BATCHNORM(input_shape=(64,64,3),output_shape = 121, include_top = True):
     """
     Convolutional auto-encoder model, symmetric.
     Using the cnn network implementation VGG16 as feature extractor
@@ -90,22 +131,23 @@ def VGG_BATCHNORM(input_shape=(64,64,3),output_shape = 121):
     x = tf.keras.layers.Conv2D(512, (3, 3), padding="same" )(x)
     x = tf.keras.layers.BatchNormalization(axis=-1)(x)
     x = tf.keras.layers.Activation('relu')(x)
-    #x = GlobalAveragePooling2D()(x)
     x = tf.keras.layers.MaxPooling2D((2, 2), padding='same')(x)
 
-    x = tf.keras.layers.Flatten()(x)
-    x = tf.keras.layers.Dense(4096, activation='relu')(x)
-    x = tf.keras.layers.Dense(256)(x)
-    x = tf.keras.layers.Activation('relu')(x)
-    x = tf.keras.layers.Dense(output_shape, activation='softmax')(x)
+    if include_top == False:
+        return tf.keras.models.Model(inputs, x,name="VGG16")
 
-    vgg =  tf.keras.models.Model(inputs, x,name="VGG16")
+    else:
+        x = tf.keras.layers.Flatten()(x)
+        x = tf.keras.layers.Dense(4096, activation='relu')(x)
+        x = tf.keras.layers.Dense(4096)(x)
+        x = tf.keras.layers.Activation('relu')(x)
+        x = tf.keras.layers.Dense(output_shape, activation='softmax')(x)
+        return  tf.keras.models.Model(inputs, x,name="VGG16")
 
-    return vgg
 
 
 
-def COAPNET(input_shape = (64,64,3), output_shape = 121):
+def COAPNET(input_shape = (64,64,3), output_shape = 121, include_top = True):
     """
     Convolutional auto-encoder model, symmetric.
     Using the cnn network implementation COAPNET as feature extractor
@@ -137,50 +179,62 @@ def COAPNET(input_shape = (64,64,3), output_shape = 121):
 
     # apply (CONV => BN layer => ReLU activation) + MaxPooling
     x = tf.keras.layers.Conv2D(512, (3, 3), padding="same" )(x)
-    x = tf.keras.layers.BatchNormalization(axis=-1)(x)
-    x = tf.keras.layers.Activation('relu')(x)
-    x = tf.keras.layers.MaxPooling2D((2, 2), padding='same')(x)
+    #x = tf.keras.layers.BatchNormalization(axis=-1)(x)
+    #x = tf.keras.layers.Activation('relu')(x)
+    #x = tf.keras.layers.MaxPooling2D((2, 2), padding='same')(x)
 
-    x = tf.keras.layers.Flatten()(x)
-    x = tf.keras.layers.Dense(512, activation='relu')(x)
-    x = tf.keras.layers.Dense(1024, activation='relu')(x)
-    x = tf.keras.layers.Dense(256)(x)
-    x = tf.keras.layers.Activation('relu')(x)
-    x = tf.keras.layers.Dense(output_shape, activation='softmax')(x)
+    if include_top == False:
+        return tf.keras.models.Model(inputs, x,name="COAPNET")
+    else:
+        x = tf.keras.layers.Flatten()(x)
+        x = tf.keras.layers.Dense(512, activation='relu')(x)
+        x = tf.keras.layers.Dense(512, activation='relu')(x)
+        x = tf.keras.layers.Dense(512)(x)
+        x = tf.keras.layers.Activation('relu')(x)
+        x = tf.keras.layers.Dense(output_shape, activation='softmax')(x)
 
-    return tf.keras.models.Model(inputs, x,name="COAPNET")
+        return tf.keras.models.Model(inputs, x,name="COAPNET")
 
 
 #based on https://adventuresinmachinelearning.com/introduction-resnet-tensorflow-2/
 #Currently not used!
-def RESNET():
-    num_res_net_blocks = 20
+def RESNET(input_shape = (64,64,3),output_shape = 121):
+    num_res_net_blocks = 5
     # define the input to the encoder
-    inputShape = (64, 64, 3)
+    inputShape = input_shape
     inputs = tf.keras.layers.Input(shape=inputShape)
-    x = tf.keras.layers.Conv2D(32, 3, activation='relu')(inputs)
+    x = tf.keras.layers.Conv2D(64, 3, activation='relu')(inputs)
     x = tf.keras.layers.Conv2D(64, 3, activation='relu')(x)
     x = tf.keras.layers.MaxPooling2D(3)(x)
     num_res_net_blocks = 10
-    for i in range(num_res_net_blocks):
+    for i in range(6):
         x = res_net_block(x, 64, 3)
-    x = tf.keras.layers.Conv2D(64, 3, activation='relu')(x)
+    x = tf.keras.layers.Conv2D(128, 3, activation='relu')(x)
+    for i in range(7):
+        x = res_net_block(x, 128, 3)
+    x = tf.keras.layers.Conv2D(256, 3, activation='relu')(x)
+    for i in range(11):
+        x = res_net_block(x, 256,3)
+    x = tf.keras.layers.Conv2D(512, 3, activation='relu')(x)
+    for i in range(5):
+        x = res_net_block(x, 512,3)
+
     x = tf.keras.layers.GlobalAveragePooling2D()(x)
     #x = tf.keras.layers.Dense(256, activation='relu')(x)
     #x = tf.keras.layers.Dropout(0.5)(x)
-    outputs = tf.keras.layers.Dense(121, activation='softmax')(x)
+    outputs = tf.keras.layers.Dense(output_shape, activation='softmax')(x)
     return tf.keras.models.Model(inputs, outputs, name="RESNET")
 
 
 
 def res_net_block(input_data, filters, conv_size):
-  x = tf.keras.layers.Conv2D(filters, conv_size, activation='relu', padding='same')(input_data)
-  x = tf.keras.layers.BatchNormalization()(x)
-  x = tf.keras.layers.Conv2D(filters, conv_size, activation=None, padding='same')(x)
-  x = tf.keras.layers.BatchNormalization()(x)
-  x = tf.keras.layers.Add()([x, input_data])
-  x = tf.keras.layers.Activation('relu')(x)
-  return x
+    x = tf.keras.layers.Conv2D(filters, conv_size, activation='relu', padding='same')(input_data)
+    x = tf.keras.layers.BatchNormalization()(x)
+    x = tf.keras.layers.Conv2D(filters, conv_size, activation=None, padding='same')(x)
+    x = tf.keras.layers.BatchNormalization()(x)
+    x = tf.keras.layers.Add()([x, input_data])
+    x = tf.keras.layers.Activation('relu')(x)
+    return x
 
 
 

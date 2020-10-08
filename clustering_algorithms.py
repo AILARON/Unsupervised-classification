@@ -32,6 +32,17 @@ from sklearn.cluster import SpectralClustering
 #PCA
 from sklearn.decomposition import PCA
 
+#Birch
+from sklearn.cluster import Birch
+
+#DBSCAN
+from sklearn.cluster import DBSCAN
+
+#Gaussian mixture
+from sklearn.mixture import GaussianMixture
+
+
+
 class HierarchicalClustering():
     '''
     HierarchicalClustering Algorithm
@@ -218,6 +229,71 @@ class SpectralCluster(ClusterAlgorithm):
         return self.model.fit_predict(X)
     pass
 
+class BIRCHCluster(ClusterAlgorithm):
+    n_clusters = 5
+    n_init = 1000
+
+    def __init__(self,n_clusters = 5, n_init = 1000):
+        self.n_clusters = n_clusters
+        self.n_init = n_init
+        self.build_model()
+
+    def build_model(self):
+        '''
+        Build the model
+        :return: model
+        '''
+        self.model = Birch(threshold=0.01, n_clusters=self.n_clusters)
+
+
+    def fit(self, X):
+        return self.model.fit(X)
+
+    def predict(self, X):
+        return self.model.predict(X)
+    pass
+
+class DBSCANCluster(ClusterAlgorithm):
+    n_clusters = 5
+
+    def __init__(self,n_clusters = 5):
+        self.n_clusters = n_clusters
+        self.build_model()
+
+    def build_model(self):
+        '''
+        Build the model
+        :return: model
+        '''
+        self.model = model = DBSCAN(eps=0.1, min_samples=500)
+
+    def fit(self, X):
+        return self.model.fit(X)
+
+    def predict(self, X):
+        return self.model.fit_predict(X)
+    pass
+
+class GaussianMixtureCluster(ClusterAlgorithm):
+    n_clusters = 5
+
+    def __init__(self,n_clusters = 5):
+        self.n_clusters = n_clusters
+        self.build_model()
+
+    def build_model(self):
+        '''
+        Build the model
+        :return: model
+        '''
+        self.model = model = GaussianMixture(n_components=self.n_clusters)
+
+    def fit(self, X):
+        return self.model.fit(X)
+
+    def predict(self, X):
+        return self.model.predict(X)
+    pass
 
 class TSNEAlgo():
     tsne = None

@@ -215,21 +215,35 @@ def visualize_class_activation_map(model, data):
         """
         CAM approach based on https://github.com/jacobgil/keras-cam/blob/master/cam.py
         """
+        modeltype = 'cnn'
+        if modeltype == 'cnn':
+            print(data.shape)
+            width, height, _ = data[0].shape
+            class_weights = model.layers[-5].get_weights()
+            final_conv_layer = get_output_layer(model, "conv2d_9")
+            print(final_conv_layer)
+            print(model.layers[0].input)
+            get_output = K.function([model.layers[0].input], \
+                        [final_conv_layer.output,
+            model.layers[-5].output])
+            [conv_outputs, predictions] = get_output([data])
 
-        width, height, _ = data[0].shape
-        auto, enc, pre = model.getModel()
+            print(conv_outputs.shape)
+        else:
+            width, height, _ = data[0].shape
+            auto, enc, pre = model.getModel()
 
-        #Get the last layer of the encoder (global average pool layer) .
-        class_weights = enc.layers[-1].get_weights()
-        final_conv_layer = get_output_layer(enc, "encoded5")
-        print(final_conv_layer)
-        print(enc.layers[0].input)
-        get_output = K.function([enc.layers[0].input], \
-                    [final_conv_layer.output,
-        enc.layers[-1].output])
-        [conv_outputs, predictions] = get_output([data])
+            #Get the last layer of the encoder (global average pool layer) .
+            class_weights = enc.layers[-1].get_weights()
+            final_conv_layer = get_output_layer(enc, "encoded5")
+            print(final_conv_layer)
+            print(enc.layers[0].input)
+            get_output = K.function([enc.layers[0].input], \
+                        [final_conv_layer.output,
+            enc.layers[-1].output])
+            [conv_outputs, predictions] = get_output([data])
 
-        print(conv_outputs.shape)
+            print(conv_outputs.shape)
 
         outputs = None
         for i in range(0, 10):
@@ -240,23 +254,26 @@ def visualize_class_activation_map(model, data):
             prediction = predictions[i,:]
 
         	#Create the class activation map.
-            cam = np.zeros(dtype = np.float32, shape = (4,4))
+            cam = np.zeros(dtype = np.float32, shape = (28,28))
 
             #print(conv_output[:, :,0])
+            print(conv_output.shape)
+            print(prediction)
             for k in range(len(prediction)):
                 cam += prediction[k] * conv_output[:, :,k]
 
             cam /= np.max(cam)
             print(cam)
-            cam = cv2.resize(cam, (64, 64))
-            heatmap = cam
+            cam = cv2.resize(cam, (224, 224))
+
+            #heatmap = cam
 
             #Depending on network output the color intensity making red highest is either of these:
-            #heatmap = cv2.applyColorMap((255*cam).astype("uint8"), cv2.COLORMAP_JET)
-            heatmap = cv2.applyColorMap(np.uint8(255 * (255 - heatmap)), cv2.COLORMAP_JET)
-
+            heatmap = cv2.applyColorMap((255*cam).astype("uint8"), cv2.COLORMAP_JET)
+            #heatmap = cv2.applyColorMap(np.uint8(255 * (255 - heatmap)), cv2.COLORMAP_JET)
+            heatmap[np.where(cam < 0.2)] = 0
             #add in original image
-            recovered = heatmap*0.3 + original
+            recovered = heatmap*0.5 + original
 
         	# stack the original and reconstructed image side-by-side
             #output = np.hstack([original, recovered])
@@ -267,7 +284,7 @@ def visualize_class_activation_map(model, data):
 
         	# otherwise, vertically stack the output
             else:
-                outputs = np.hstack([outputs, output])
+                outputs = np.hstack([outputs, recovered])
 
         cv2.imwrite("output_path"+".png", outputs)
 

@@ -16,6 +16,7 @@ from network_model import NetworkModel
 from results import getNetworkResults
 
 from deep_cluster import DeepCluster
+#from deepclusterold import DeepCluster
 
 #Set up GPU
 gpu = 1
@@ -80,15 +81,15 @@ def test():
     import csv
     import pathlib
     print("sad")
-    print(pathlib.Path("dataset/kaggle_original_train/").glob('*/*.jpg'))
+    print(pathlib.Path("dataset/kaggletrainoriginalfull/").glob('*/*.jpg'))
     import glob
 
     # Returns a list of names in list files.
     print("Using glob.glob()")
-    files = glob.glob('dataset/kaggle_original_train//**/*.jpg',
+    files = glob.glob('dataset/kaggletrainoriginalfull//**/*.jpg',
                        recursive = True)
 
-    filepath = pathlib.Path("dataset/kaggle_original_train/")
+    filepath = pathlib.Path("dataset/kaggletrainoriginalfull/")
 
     data = []
     classes = np.array([item.name for item in filepath.glob('*') if item.name != "test"])
@@ -109,7 +110,7 @@ def test():
     #self.CLASS_NAMES = np.array([item.name for item in self.data_dir.glob('*') if item.name != "test"])
     #np.where(label.numpy())[0]
 
-    with open('test.csv', 'w') as file:
+    with open('truelabels.csv', 'w') as file:
         writer = csv.writer(file)
         writer.writerow(["id","label"])
         for d in data:
@@ -134,7 +135,8 @@ if __name__=="__main__":
     #test()
     #test2()
     #os.exit()
-
+    from gradcam import grad
+    grad()
     model = "DM"
 
     if model == "data_statistics":
@@ -155,9 +157,13 @@ if __name__=="__main__":
     if model == "DM":
         #train_data = LoadDataset("dataset/kaggletrainoriginalfull/",0,False)
         #train_data, train_label, val, val_label = train_data.load_data()
+
         model = DeepCluster()
+        #model.train(0)
+        model.train(1)
+        model.train(2)
         #for i in range(3):
-        model.new_train(1)
+        #    model.train(i)
 
 
     if model == "auto":
