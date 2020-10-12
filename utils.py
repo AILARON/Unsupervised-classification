@@ -130,7 +130,8 @@ def visualize_input(image_data, name ="name"):
             hstack = None
             for j in range (4):
                 print(i*4 +j)
-                original = image_data[i*4 +j] *255 #+239
+                original = (image_data[i*4 +j] +1)*127 #+239
+
                 if hstack is None:
                     hstack = original
                 else:

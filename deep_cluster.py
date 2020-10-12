@@ -54,7 +54,7 @@ class DeepCluster:
         network_archs = ["coapnet","vgg","resnet"]
         network = network_archs[arch]
 
-        initialize_previous = False
+        initialize_previous = True
 
         if network == "vgg":
             if initialize_previous == True:
@@ -136,7 +136,7 @@ class DeepCluster:
         else:
             self.epochs = 20
 
-        if initialize_previous == False:
+        if initialize_previous == True:
             #Preprocess data
             #preprocess_training = Preprocessing(train_data, labels, dataset='Kaggle', num_classes = 100)
 

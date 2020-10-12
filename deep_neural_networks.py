@@ -137,7 +137,8 @@ def VGG_BATCHNORM(input_shape=(64,64,3),output_shape = 121, include_top = True):
         return tf.keras.models.Model(inputs, x,name="VGG16")
 
     else:
-        x = tf.keras.layers.Flatten()(x)
+        #x = tf.keras.layers.Flatten()(x)
+        x = tf.keras.layers.GlobalAveragePooling2D()(x)
         x = tf.keras.layers.Dense(4096, activation='relu')(x)
         x = tf.keras.layers.Dense(4096)(x)
         x = tf.keras.layers.Activation('relu')(x)

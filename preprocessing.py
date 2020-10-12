@@ -115,6 +115,9 @@ class Preprocessing():
         )
         return ds
 
+    def returnImages(self):
+        return self.data
+
     def returnDataset(self):
         return tf.data.Dataset.from_tensor_slices((self.data, self.label)).batch(32)
 

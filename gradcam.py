@@ -1,4 +1,4 @@
-
+## https://www.pyimagesearch.com/2020/03/09/grad-cam-visualize-class-activation-maps-with-keras-tensorflow-and-deep-learning/
 
 # import the necessary packages
 from tensorflow.keras.models import Model
@@ -106,11 +106,61 @@ import numpy as np
 import cv2
 
 
+
+
+
+def gradImage(model,image):
+    orig = image.copy()
+
+    # Preprocess image
+    # Subtract mean and make it into -1 - 1 domain
+    image = (image - 239.64)/255
+    image = np.expand_dims(image, axis=0)
+    print(image.shape)
+    print('Data min=%.3f, max=%.3f' % (image.min(), image.max()))
+
+    # use the network to make predictions on the input image and find
+    # the class label index with the largest corresponding probability
+    preds = model.predict(image)
+    i = np.argmax(preds[0])
+    print(i)
+    print(preds[0][i])
+
+    # initialize our gradient class activation map and build the heatmap
+    cam = GradCAM(model, i)
+    heatmap = cam.compute_heatmap(image)
+    # resize the resulting heatmap to the original input image dimensions
+    # and then overlay heatmap on top of the image
+    heatmap = cv2.resize(heatmap, (224, 224))
+    (heatmap, output) = cam.overlay_heatmap(heatmap, orig, alpha=0.5)
+
+    return output
+
+def printOutput(data):
+    output = "3x3"
+    if output == "3x3":
+        hstack = None
+        vstack = None
+        for i in range (3):
+            hstack = None
+            for j in range (3):
+                print(i*3 +j)
+                original = data[i*3 +j]
+                if hstack is None:
+                    hstack = original
+                else:
+                    hstack = np.hstack([hstack, original])
+            if vstack is None:
+                vstack = hstack
+            else:
+                vstack = np.vstack([vstack, hstack])
+        cv2.imwrite("output_gradcam.png",vstack)
+
 from deep_neural_networks import VGG_BATCHNORM, RESNET101,RESNET50, COAPNET, RESNET, BOF_MODELS
 from load_dataset import importWHOI, importKaggleTrain, importKaggleTest
 
 def grad():
-    model = VGG_BATCHNORM(input_shape=(224,224,3),output_shape = 200)
+    model = RESNET101(input_shape=(224,224,3),output_shape = 200)
     model = loadWeights(model)
 
     train_data, _ = importKaggleTrain(depth=1)
@@ -121,10 +171,22 @@ def grad():
     orig=np.stack([orig]*3, axis=-1)
     orig = orig.reshape(224,224,3)
 
-
-
     orig = orig.astype("uint8")
     print(orig.shape)
+
+    images = []
+    for i in range(10):
+        orig = data[i].copy()
+        orig=np.stack([orig]*3, axis=-1)
+        orig = orig.reshape(224,224,3)
+        orig = orig.astype("uint8")
+
+        images.append(gradImage(model,orig))
+
+    printOutput(images)
+    #cv2.imwrite("output_gradcam"+".png", output)
+
+    """
 
     image = orig.copy()
 
@@ -169,7 +231,7 @@ def grad():
     #output = imutils.resize(output, height=700)
     cv2.imwrite("output_gradcam"+".png", output)
     #cv2.waitKey(0)
-
+    """
 def loadWeights(model):
     print("[Info] loading previous weights")
     try:

@@ -27,9 +27,9 @@ if gpu == 0:
 if gpu == 1:
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
     print("physical_devices-------------", len(physical_devices))
-    tf.config.experimental.set_visible_devices(physical_devices[1], 'GPU')
+    tf.config.experimental.set_visible_devices(physical_devices[0], 'GPU')
 
-    tf.config.experimental.set_memory_growth(physical_devices[1], True)
+    tf.config.experimental.set_memory_growth(physical_devices[0], True)
     #tf.config.experimental.set_memory_growth(physical_devices[1], True)
 
 
@@ -136,7 +136,18 @@ if __name__=="__main__":
     #test2()
     #os.exit()
     from gradcam import grad
+    from bof_model import example
+    from gan import dcGan
+    from dcgan import gan
+    from cgan import cGan
+    from mnistgan import gan
+    #gan()
+    #cGan()
+    #dcGan()
+    #example()
+    #sys.exit()
     grad()
+    sys.exit()
     model = "DM"
 
     if model == "data_statistics":
