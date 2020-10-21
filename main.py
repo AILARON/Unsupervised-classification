@@ -27,9 +27,9 @@ if gpu == 0:
 if gpu == 1:
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
     print("physical_devices-------------", len(physical_devices))
-    tf.config.experimental.set_visible_devices(physical_devices[0], 'GPU')
+    tf.config.experimental.set_visible_devices(physical_devices[1], 'GPU')
 
-    tf.config.experimental.set_memory_growth(physical_devices[0], True)
+    tf.config.experimental.set_memory_growth(physical_devices[1], True)
     #tf.config.experimental.set_memory_growth(physical_devices[1], True)
 
 
@@ -141,13 +141,15 @@ if __name__=="__main__":
     from dcgan import gan
     from cgan import cGan
     from mnistgan import gan
+    from preprocessing import makeCSVFile
+    #makeCSVFile('test', split = 0.1)
     #gan()
     #cGan()
     #dcGan()
     #example()
+
+    #grad()
     #sys.exit()
-    grad()
-    sys.exit()
     model = "DM"
 
     if model == "data_statistics":
@@ -170,9 +172,9 @@ if __name__=="__main__":
         #train_data, train_label, val, val_label = train_data.load_data()
 
         model = DeepCluster()
-        #model.train(0)
-        model.train(1)
         model.train(2)
+        #model.train(0)
+        #model.train(2)
         #for i in range(3):
         #    model.train(i)
 

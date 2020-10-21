@@ -160,7 +160,7 @@ from deep_neural_networks import VGG_BATCHNORM, RESNET101,RESNET50, COAPNET, RES
 from load_dataset import importWHOI, importKaggleTrain, importKaggleTest
 
 def grad():
-    model = RESNET101(input_shape=(224,224,3),output_shape = 200)
+    model = RESNET50(input_shape=(224,224,3),output_shape = 200)
     model = loadWeights(model)
 
     train_data, _ = importKaggleTrain(depth=1)
@@ -168,6 +168,7 @@ def grad():
     data = np.array([cv2.resize(img, dsize=(224,224), interpolation=cv2.INTER_LINEAR) for img in (train_data[0:32])])
 
     orig = data[0].copy()
+    
     orig=np.stack([orig]*3, axis=-1)
     orig = orig.reshape(224,224,3)
 

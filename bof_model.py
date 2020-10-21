@@ -10,7 +10,7 @@ import tensorflow as tf
 from cbof import BoF_Pooling, initialize_bof_layers
 from spp import SpatialPyramidPooling
 
-from preprocessing import Preprocessing
+from preprocessing import Preprocessing, PreprocessingFromDataframe
 
 
 import cv2
@@ -81,7 +81,7 @@ def build_model(pool_type='max', n_output_filters=32, n_codewords=32):
 
     model = tf.keras.Sequential()
 
-    model.add(tf.keras.layers.Conv2D(64, kernel_size=(2, 2),padding="same", input_shape=(input_size, input_size, 1)))
+    model.add(tf.keras.layers.Conv2D(64, kernel_size=(2, 2),padding="same", input_shape=(input_size, input_size, 3)))
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.Activation('relu'))
     model.add(tf.keras.layers.MaxPooling2D(pool_size=(2, 2)))
@@ -122,7 +122,7 @@ def build_model(pool_type='max', n_output_filters=32, n_codewords=32):
     model.add(tf.keras.layers.Dense(256, activation='relu'))
 
     model.add(tf.keras.layers.Dense(121, activation='softmax'))
-    model.compile(loss=tf.keras.losses.categorical_crossentropy, optimizer=tf.keras.optimizers.SGD(lr=0.001),
+    model.compile(loss=tf.keras.losses.categorical_crossentropy, optimizer=tf.keras.optimizers.SGD(lr=0.01),
                   metrics=['accuracy'])
 
 
@@ -131,126 +131,212 @@ def build_model(pool_type='max', n_output_filters=32, n_codewords=32):
     return model
 
 
+def COAPNET(input_shape = (None,None,3), output_shape = 121, include_top = True):
+    """
+    Convolutional auto-encoder model, symmetric.
+    Using the cnn network implementation COAPNET as feature extractor
+    """
+    # define the input to the encoder
+    #inputShape = (64, 64, 3)
+    inputs = tf.keras.layers.Input(shape=input_shape)
+
+    # apply (CONV => BN layer => ReLU activation) + MaxPooling
+    x = tf.keras.layers.Conv2D(64, (3, 3), padding="same" )(inputs)
+    x = tf.keras.layers.BatchNormalization(axis=-1)(x)
+    x = tf.keras.layers.Activation('relu')(x)
+    x = tf.keras.layers.MaxPooling2D((2, 2), padding='same')(x)
+
+
+    # apply (CONV => BN layer => ReLU activation) + MaxPooling
+    x = tf.keras.layers.Conv2D(128, (3, 3), padding="same" )(x)
+    x = tf.keras.layers.BatchNormalization(axis=-1)(x)
+    x = tf.keras.layers.Activation('relu')(x)
+    x = tf.keras.layers.MaxPooling2D((2, 2), padding='same')(x)
+
+
+    # apply (CONV => BN layer => ReLU activation) + MaxPooling
+    x = tf.keras.layers.Conv2D(256, (3, 3), padding="same" )(x)
+    x = tf.keras.layers.BatchNormalization(axis=-1)(x)
+    x = tf.keras.layers.Activation('relu')(x)
+    x = tf.keras.layers.MaxPooling2D((2, 2), padding='same')(x)
+
+
+    # apply (CONV => BN layer => ReLU activation) + MaxPooling
+    x = tf.keras.layers.Conv2D(512, (3, 3), padding="same" )(x)
+    #x = tf.keras.layers.BatchNormalization(axis=-1)(x)
+    #x = tf.keras.layers.Activation('relu')(x)
+    #x = tf.keras.layers.MaxPooling2D((2, 2), padding='same')(x)
+
+    if include_top == False:
+        return tf.keras.models.Model(inputs, x,name="SPP")
+    else:
+        x = SpatialPyramidPooling([1, 2,3])(x)
+        x = tf.keras.layers.Dense(512, activation='relu')(x)
+        x = tf.keras.layers.Dense(512, activation='relu')(x)
+        x = tf.keras.layers.Dense(256)(x)
+        x = tf.keras.layers.Activation('relu')(x)
+        x = tf.keras.layers.Dense(output_shape, activation='softmax')(x)
+
+        return tf.keras.models.Model(inputs, x,name="SPP")
+
+
 def evaluate_model(pool_type, n_filters=128, n_codewords=0):
     x_train, y_train, x_test, y_test = load_kaggle()
 
-    #preprocess_training = Preprocessing(x_train,y_train)
-    #preprocess_test = Preprocessing(x_test, y_test)
+    if pool_type == 'bof' or pool_type == 'spatial_bof':
 
-    #dataset_train = preprocess_training.returnAugmentedDataset()
-    #dataset_test = preprocess_test.returnDataset()
+        preprocess_training = Preprocessing(x_train,y_train)
+        preprocess_test = Preprocessing(x_test, y_test)
 
-    #preprocess data:
+        dataset_train = preprocess_training.returnAugmentedDataset()
+        dataset_test = preprocess_test.returnDataset()
 
-    #x_train = np.array([np.expand_dims((image-239)/255,0) for image in (x_train)])
+        print("Evaluating model: ", pool_type)
+        model = build_model(pool_type, n_output_filters=n_filters, n_codewords=n_codewords)
+        model.fit(dataset, epochs=100, verbose=1,shuffle=True, steps_per_epoch=27302//32)
 
+    elif pool_type == 'spp':
+        training_type = ['variable_size','variable_size_batch','variable_size_epoch']
+        type = training_type[2]
 
-    test = []
-    for i, image in enumerate(x_train):
-        x_train[i] = (image)/255
-        #test.append(np.expand_dims(x_train[i], axis=0))
+        if type == 'variable_size':
+            #Train network using spp model on variable size images
 
-    #print(test)
-    #x_train = np.array(test)
+            #preprocess dataset
+            for i, image in enumerate(x_train):
+                x_train[i] = (image)/255
+            # make tf dataset
+            import itertools
+            dataset = tf.data.Dataset.from_generator(lambda: itertools.zip_longest(x_train, y_train),
+                                              output_types=(tf.float32, tf.float32),
+                                              output_shapes=(tf.TensorShape([None, None, 1]),
+                                                             tf.TensorShape([None])))
 
-    #print(x_train.shape)
-    #print(x_train[0].shape)
+            # train model
+            loss_fn = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.01,momentum=0.09)
 
-    import itertools
-    dataset = tf.data.Dataset.from_generator(lambda: itertools.zip_longest(x_train, y_train),
-                                      output_types=(tf.float32, tf.float32),
-                                      output_shapes=(tf.TensorShape([None, None, 1]),
-                                                     tf.TensorShape([None])))
-    dataset=dataset.padded_batch(32,padded_shapes=([None,None,1],[None]))
-    #dataset = tf.data.Dataset.from_generator(lambda: x_train, tf.float32, output_shapes=[None,None,1])
+            epochs = 2
+            for epoch in range(epochs):
+                print("\nStart of epoch %d" % (epoch,))
 
-    iterator = dataset.make_one_shot_iterator()
-
-
-    #rt=tf.ragged.constant(x_train)
-    #dataset = tf.data.Dataset.from_tensor_slices(rt).batch(32)
-
-
-    print((iterator.get_next()))  # ==> '[4, 2]'
-    print((iterator.get_next()))  # ==> '[3, 4, 5]'
-
-    #print(list(dataset.take(3)))
-
-    #for i, element in enumerate(dataset):
-    #    print(element.shape)
-
-    print("Evaluating model: ", pool_type)
-    model = build_model(pool_type, n_output_filters=n_filters, n_codewords=n_codewords)
-    model.fit(dataset, epochs=1, verbose=1,shuffle=True, steps_per_epoch=27302//32)
-    #initialize_bof_layers(model, preprocess_training.returnImages())
-
-    #for i in range(len(model.layers)-1):
-    #    model.layers[i].trainable = False
-
-    #model.compile(loss=tf.keras.losses.categorical_crossentropy, optimizer=tf.keras.optimizers.SGD(lr=0.001),
-    #              metrics=['accuracy'])
-
-    #print(model.summary())
-    loss_fn = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
-    optimizer = tf.keras.optimizers.SGD(learning_rate=0.01,momentum=0.09)
-
-    epochs = 2
-    for epoch in range(epochs):
-        print("\nStart of epoch %d" % (epoch,))
-
-        # Iterate over the batches of the dataset.
-        for step, (x_batch_train, y_batch_train) in enumerate(dataset):
+                # Iterate over the batches of the dataset.
+                for step, (x_batch_train, y_batch_train) in enumerate(dataset):
 
 
-            # Open a GradientTape to record the operations run
-            # during the forward pass, which enables auto-differentiation.
-            with tf.GradientTape() as tape:
+                    # Open a GradientTape to record the operations run
+                    # during the forward pass, which enables auto-differentiation.
+                    with tf.GradientTape() as tape:
 
-                # Run the forward pass of the layer.
-                # The operations that the layer applies
-                # to its inputs are going to be recorded
-                # on the GradientTape.
-                logits = model(x_batch_train, training=True)  # Logits for this minibatch
+                        # Run the forward pass of the layer.
+                        # The operations that the layer applies
+                        # to its inputs are going to be recorded
+                        # on the GradientTape.
+                        logits = model(x_batch_train, training=True)  # Logits for this minibatch
 
-                # Compute the loss value for this minibatch.
-                loss_value = loss_fn(y_batch_train, logits)
+                        # Compute the loss value for this minibatch.
+                        loss_value = loss_fn(y_batch_train, logits)
 
-            # Use the gradient tape to automatically retrieve
-            # the gradients of the trainable variables with respect to the loss.
-            grads = tape.gradient(loss_value, model.trainable_weights)
+                    # Use the gradient tape to automatically retrieve
+                    # the gradients of the trainable variables with respect to the loss.
+                    grads = tape.gradient(loss_value, model.trainable_weights)
 
-            # Run one step of gradient descent by updating
-            # the value of the variables to minimize the loss.
-            optimizer.apply_gradients(zip(grads, model.trainable_weights))
+                    # Run one step of gradient descent by updating
+                    # the value of the variables to minimize the loss.
+                    optimizer.apply_gradients(zip(grads, model.trainable_weights))
 
-            # Log every 200 batches.
-            if step % 10 == 0:
-                print(
-                    "Training loss (for one batch) at step %d: %.4f"
-                    % (step, float(loss_value))
-                )
-                print("Seen so far: %s samples" % ((step + 1) ))
+                    # Log every 200 batches.
+                    if step % 10 == 0:
+                        print(
+                            "Training loss (for one batch) at step %d: %.4f"
+                            % (step, float(loss_value))
+                        )
+                        print("Seen so far: %s samples" % ((step + 1) ))
 
-    for i, element in enumerate(dataset):
-        model.fit(dataset, epochs=1, verbose=1,shuffle=True, steps_per_epoch=27302//32)
+        if type == 'variable_size_batch':
 
-    #for i in range(len(model.layers)-1):
-    #    model.layers[i].trainable = True
+            #Train network using spp model on variable size images batches
 
-    #model.compile(loss=tf.keras.losses.categorical_crossentropy, optimizer=tf.keras.optimizers.SGD(lr=0.01),
-    #              metrics=['accuracy'])
+            #preprocess dataset
+            for i, image in enumerate(x_train):
+                x_train[i] = (image)/255
+
+            for i, image in enumerate(x_test):
+                x_test[i] = (image)/255
+            # make tf dataset
+            import itertools
+            dataset = tf.data.Dataset.from_generator(lambda: itertools.zip_longest(x_train, y_train),
+                                              output_types=(tf.float32, tf.float32),
+                                              output_shapes=(tf.TensorShape([None, None, 1]),
+                                                             tf.TensorShape([None])))
+
+            dataset_test = tf.data.Dataset.from_generator(lambda: itertools.zip_longest(x_test, y_test),
+                                              output_types=(tf.float32, tf.float32),
+                                              output_shapes=(tf.TensorShape([None, None, 1]),
+                                                             tf.TensorShape([None])))
+
+            dataset=dataset.padded_batch(32,padded_shapes=([None,None,1],[None])).shuffle(40000).repeat(count=100)
+
+            dataset_test=dataset_test.padded_batch(32,padded_shapes=([None,None,1],[None])).shuffle(10000).repeat(count=100)
 
 
-    #print(model.summary())
-    #model.fit(dataset_train, epochs=300, verbose=1,shuffle=True, validation_data=dataset_test, steps_per_epoch= x_train.shape[0] // 32,
-    #validation_steps= x_test.shape[0] // 32)
+            iterator = dataset.make_one_shot_iterator()
 
-    acc = 100 * model.evaluate(x_test, y_test, verbose=0)[1]
-    print('Test error:', 100 - acc)
+            print((iterator.get_next()))  # ==> '[4, 2]'
+            print((iterator.get_next()))  # ==> '[3, 4, 5]'
 
-    if pool_type != 'max':
-        acc1 = 100 * model.evaluate(resize_images(x_test, scale=0.8), y_test, verbose=0)[1]
-        print("Test error (scale=0.8): ", 100 - acc1)
+            print("Evaluating model: ", pool_type)
+            model = build_model(pool_type, n_output_filters=n_filters, n_codewords=n_codewords)
+            model.fit(dataset, epochs=100, verbose=1,shuffle=True, steps_per_epoch=27302//32, validation_data =dataset_test,validation_steps= x_test.shape[0] // 32)
+
+
+        if type == 'variable_size_epoch':
+            preprocess = PreprocessingFromDataframe(x_train,y_train,image_width = 64, image_height = 64)
+            epochs = 100
+            import random
+            #model = build_model(pool_type, n_output_filters=n_filters, n_codewords=n_codewords)
+            model = COAPNET()
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.001, momentum=0.9, nesterov=False)
+            stopping = tf.keras.callbacks.EarlyStopping(
+            monitor='val_loss', min_delta=0.01, patience=5, verbose=1, mode='auto',
+            baseline=None, restore_best_weights=False)
+
+            model.compile(optimizer=optimizer, loss=tf.keras.losses.CategoricalCrossentropy(), metrics=['accuracy'])
+            for i in range(epochs):
+                print('epoch',i)
+                image_dim = random.randint(100, 160)
+                print(image_dim)
+                if image_dim % 2 == 1:
+                    image_dim += 1
+                preprocess.updateImageSize(image_dim,image_dim)
+
+                dataset_train = preprocess.createPreprocessedAugmentedDataset()
+                dataset_test = preprocess.createPreprocessedDataset()
+
+                print("Evaluating model: ", pool_type)
+
+                model.fit(dataset_train, epochs=1, verbose=1,shuffle=True, steps_per_epoch=27302//32,validation_data =dataset_test,
+                validation_steps= x_test.shape[0] // 32,callbacks =[stopping])
+
+            saveWeights(model)
+
+def saveWeights(model):
+    # Save JSON config to disk
+    json_config = model.to_json()
+    with open('model_config.json', 'w') as json_file:
+        json_file.write(json_config)
+        # Save weights to disk
+        print("[Info] saving weights")
+        model.save_weights(str(model.name)+"_"+"baseline"+'_weights.h5')
+
+def loadWeights(model):
+    print("[Info] loading previous weights")
+    try:
+        model.load_weights(str(model.name)+"_"+"baseline"+'_weights.h5')
+    except:
+        print("Could not load weights")
+
+    return model
 
 
 def example():

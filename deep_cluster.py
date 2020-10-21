@@ -39,7 +39,7 @@ class DeepCluster:
     epochs = 2
 
     NUM_CLUSTER = 200
-    input_shape = (224,224,3)
+    input_shape = (64,64,3)
     verbose = 1
 
     def __init__(self):
@@ -54,7 +54,7 @@ class DeepCluster:
         network_archs = ["coapnet","vgg","resnet"]
         network = network_archs[arch]
 
-        initialize_previous = True
+        initialize_previous = False
 
         if network == "vgg":
             if initialize_previous == True:
@@ -73,10 +73,10 @@ class DeepCluster:
         if network == "resnet":
             if initialize_previous == True:
 
-                model = RESNET101(input_shape=self.input_shape,output_shape = self.NUM_CLUSTER)
+                model = RESNET50(input_shape=self.input_shape,output_shape = self.NUM_CLUSTER)
                 model = loadWeights(model)
             else:
-                model = RESNET101(input_shape=self.input_shape,output_shape = self.NUM_CLUSTER)
+                model = RESNET50(input_shape=self.input_shape,output_shape = self.NUM_CLUSTER)
 
         bof = False
         if bof:
@@ -134,9 +134,9 @@ class DeepCluster:
         if network == "coapnet":
             self.epochs = 30
         else:
-            self.epochs = 20
+            self.epochs = 50
 
-        if initialize_previous == True:
+        if initialize_previous == False:
             #Preprocess data
             #preprocess_training = Preprocessing(train_data, labels, dataset='Kaggle', num_classes = 100)
 
@@ -146,6 +146,9 @@ class DeepCluster:
 
             #### Initialize k means cluster #####
             deepcluster = clustering.__dict__["Kmeans"](self.NUM_CLUSTER)
+
+            loss = []
+            nmiscore = []
 
             ###### Start training ######
             for round in range(self.epochs):
@@ -188,7 +191,7 @@ class DeepCluster:
                     from sklearn.metrics.cluster import normalized_mutual_info_score
                     print("NMI old vs new = ", normalized_mutual_info_score(train_labels,self.data_y_last))
                     print("NMI new vs true = ", normalized_mutual_info_score(train_labels,true_labels))
-
+                    nmiscore.append(normalized_mutual_info_score(train_labels,self.data_y_last))
 
                 # Save labels for next comparison round
                 self.data_y_last = train_labels.copy()
@@ -216,7 +219,14 @@ class DeepCluster:
                 model.compile(optimizer=optimizer, loss=tf.keras.losses.CategoricalCrossentropy(), metrics=['accuracy'])
 
                 # Train model
-                model.fit(train_dataset, steps_per_epoch= 30336 // 32, verbose = 1, epochs = 1)
+                history = model.fit(train_dataset, steps_per_epoch= 30336 // 32, verbose = 1, epochs = 1)
+
+                saveloss = True
+
+                if saveloss == True:
+                    #print(history.history.keys())
+                    loss.append(history.history['loss'])
+
 
                 end = time.time()
 
@@ -242,6 +252,11 @@ class DeepCluster:
             if not bof:
                 #Save model
                 saveWeights(model)
+
+
+        print("GET LOSS AND NMI SCORES FOR PLOTTING")
+        print(loss)
+        print(nmiscore)
 
         ##### Get results #####
 

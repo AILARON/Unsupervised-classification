@@ -42,9 +42,11 @@ class Preprocessing():
     label = None
 
 
-    def __init__(self, data, label,dataset='Kaggle', num_classes = 121):
+    def __init__(self, data, label,dataset='Kaggle', num_classes = 121,image_width = 64, image_height = 64):
             self.DATASET = dataset
             self.NUM_CLASSES = num_classes
+            self.IMAGE_WIDTH = image_width
+            self.IMAGE_HEIGHT = image_height
 
             if dataset == 'Ailaron':
                 self.IMAGE_WIDTH = 64
@@ -67,7 +69,7 @@ class Preprocessing():
             #Make data type float 32
             data = data.astype(np.float32)
             #Center data
-            data = data - 239.64
+            data = data - data.mean()
             #Make data between 0-1 ##NOTICED THAT THIS SPEEDS UP TRAINING##
             data = data/255
             #Make depth = 3
@@ -129,11 +131,11 @@ class PreprocessingFromDataframe(Preprocessing):
     traingen = None
 
 
-    def __init__(self,data, label,dataset='Kaggle', num_classes = 121):
+    def __init__(self,data, label,dataset='Kaggle', num_classes = 121, image_width = 64, image_height = 64):
             self.DATASET = dataset
             self.NUM_CLASSES = num_classes
-            self.IMAGE_WIDTH = 224
-            self.IMAGE_HEIGHT = 224
+            self.IMAGE_WIDTH = image_width
+            self.IMAGE_HEIGHT = image_height
 
 
             if dataset == 'Ailaron':
@@ -187,7 +189,7 @@ class PreprocessingFromDataframe(Preprocessing):
         import pandas as pd
         df=pd.read_csv(r"output.csv")
         #df.columns = ['id',"label"]
-        print(df.head())
+        #print(df.head())
 
 
 
@@ -259,6 +261,106 @@ class PreprocessingFromDataframe(Preprocessing):
         labels = np.array(labels)
 
         return labels
+
+    def updateImageSize(self, image_width, image_height):
+        self.IMAGE_WIDTH = image_width
+        self.IMAGE_HEIGHT = image_height
+        return
+
+
+def get_label(file_path, classes):
+    parts = file_path.split('/')
+    return parts[-2] == classes
+
+def makeCSVFile(path, split = 0):
+    import os
+    import csv
+    import pathlib
+    import glob
+
+    # Returns a list of names in list files.
+    files = glob.glob('dataset/kaggletrainoriginalfull//**/*.jpg',
+                       recursive = True)
+
+    filepath = pathlib.Path("dataset/kaggletrainoriginalfull/")
+
+    data = []
+    labels = []
+    classes = np.array([item.name for item in filepath.glob('*') if item.name != "test"])
+    print('Found ',classes, ' classes of images in folder')
+
+    for file in files:
+        label = np.where(get_label(file,classes))[0]
+        data.append([file,label])
+        labels.append(label)
+
+    if split == 0:
+        with open('truelabels.csv', 'w') as file:
+            writer = csv.writer(file)
+            writer.writerow(["id","label"])
+            for d in data:
+                writer.writerow(d)
+    elif split > 0 and split < 1:
+        from sklearn.model_selection import train_test_split
+
+        train, test = train_test_split(data,  test_size=split, stratify = labels)
+
+        with open('trainLabels.csv', 'w') as file:
+            writer = csv.writer(file)
+            writer.writerow(["id","label"])
+            for d in train:
+                writer.writerow(d)
+
+        with open('testLabels.csv', 'w') as file:
+            writer = csv.writer(file)
+            writer.writerow(["id","label"])
+            for d in test:
+                writer.writerow(d)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 """
     def createPreprocessedDatasetasa(self, val_data,val_label):
