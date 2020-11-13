@@ -14,7 +14,7 @@ import cv2
 from tensorflow.keras import layers
 
 import numpy as np
-from load_dataset import importKaggleTrain, importKaggleTest, importAilaronTraining, importAilaronTest
+from load_dataset import importKaggle, importAilaron
 from clustering_algorithms import TSNEAlgo, PCAAlgo
 
 from clustering_algorithms import KMeansCluster, SpectralCluster

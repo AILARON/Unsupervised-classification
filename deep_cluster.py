@@ -1,11 +1,22 @@
-#################
-#Network class builds and train a network using the networks defined in the AutoEncoder class
-#################
-#https://amitness.com/2020/04/deepcluster/
+##################
+#Tensorflow-keras based implementation of DeepCluster
+#Using VGG16, 5Conv and ResNet as feature extractor
+
+#This file is based on the Caron et al. DeepCluster from the following GitHub
+#https://github.com/facebookresearch/deepcluster
+
+#Note 1. that the code is changed from a pytorch implementation to a tensorflow implementation.
+#Performance might therefore differ.
+
+#Note 2. For an easy walkthrough see https://amitness.com/2020/04/deepcluster/
+
+"""
+Input: 1. arch: which model architecture to use: 5Conv, VGG16 or ResNet152
+"""
+##################
 
 
-
-
+#imports
 import tensorflow as tf
 import numpy as np
 import time
@@ -13,30 +24,25 @@ from sklearn.metrics.cluster import normalized_mutual_info_score
 import os
 import pickle
 
-
-from cbof import BoF_Pooling, initialize_bof_layers
-from preprocessing import Preprocessing, PreprocessingFromDataframe
-
 import clustering
+
+from preprocessing import Preprocessing, PreprocessingFromDataframe
 from clustering import preprocess_features
-
 from clustering_algorithms import * #TSNEAlgo, PCAAlgo, KMeansCluster, SpectralCluster, ClusterAlgorithm
-
-
 from utils import accuracy, confusion_matrix
-
 from deep_neural_networks import VGG_BATCHNORM, RESNET101,RESNET50, COAPNET, RESNET, BOF_MODELS
+from load_dataset import importWHOI, importKaggle
+
+#CSV load files
+KAGGLE_TRAIN = 'csvloadfiles/kaggle_missing.csv'
+KAGGLE_TEST = 'csvloadfiles/kaggle_five_classes.csv'
 
 
-
-
-
-from load_dataset import importWHOI, importKaggleTrain, importKaggleTest
 class DeepCluster:
     data_x = None
     data_y = None
     data_y_last = None
-    epochs = 2
+    epochs = 35
 
     NUM_CLUSTER = 200
     input_shape = (64,64,3)
@@ -44,7 +50,7 @@ class DeepCluster:
 
     def __init__(self):
         #self.data_x = importWHOI()
-        self.data_x, self.data_y = importKaggleTrain()
+        self.data_x, self.data_y = importKaggle(train=True)
         #discard labels
         self.data_y = tf.keras.utils.to_categorical(self.data_y, num_classes=121, dtype='float32')
         #self.data_x = x
@@ -78,36 +84,18 @@ class DeepCluster:
             else:
                 model = RESNET50(input_shape=self.input_shape,output_shape = self.NUM_CLUSTER)
 
-        bof = False
-        if bof:
-            model = BOF_MODELS(backbone = "vgg")
-
         optimizer = tf.keras.optimizers.SGD(learning_rate=0.005, momentum=0.09, nesterov=False) #best 0.005
+
         model.compile(optimizer=optimizer, loss=tf.keras.losses.CategoricalCrossentropy(), metrics=['accuracy'])
 
         print(model.summary())
-
-
 
         # creating cluster assignments log
         cluster_log = Logger(os.path.join('', 'clusters'))
 
 
         ##### Load training data #####
-        train_data, _ = importKaggleTrain(depth=1)
-
-        #### if bof -- initialize bof layer ####
-
-
-        if bof:
-            import cv2
-            data = np.array([cv2.resize(img, dsize=(64,64), interpolation=cv2.INTER_LINEAR) for img in (train_data)])/255
-            #data = data[0:5000]
-            data=np.stack([data]*3, axis=-1)
-            data = data.reshape(-1, 64,64,3)
-            #data = data.reshape(100,64,64)
-            print(data.shape)
-            initialize_bof_layers(model,data)
+        train_data, _ = importKaggle(train=True)
 
         ##### Preprocessing #####
 
@@ -116,33 +104,11 @@ class DeepCluster:
         self.data_y_last= labels.copy()
 
         preprocess_training = PreprocessingFromDataframe(train_data,labels,dataset='Kaggle', num_classes = self.NUM_CLUSTER)
-        true_labels = preprocess_training.returnLabels()
+        true_labels = preprocess_training.returnLabels(KAGGLE_TRAIN)
+        num_samples =  preprocess_training.returnDatasetSize(KAGGLE_TRAIN)
 
-        test = False
-        if test:
-            train_data, _ = importKaggleTest(depth=1)
-            import cv2
-            data = np.array([cv2.resize(img, dsize=(224,224), interpolation=cv2.INTER_LINEAR) for img in (train_data[0:32])])/255
-            #data = data[0:32]
-            data=np.stack([data]*3, axis=-1)
-            data = data.reshape(-1, 224,224,3)
-
-            from utils import visualize_class_activation_map
-
-            visualize_class_activation_map(model, data)
-
-        if network == "coapnet":
-            self.epochs = 30
-        else:
-            self.epochs = 50
 
         if initialize_previous == False:
-            #Preprocess data
-            #preprocess_training = Preprocessing(train_data, labels, dataset='Kaggle', num_classes = 100)
-
-            #Return data set without augmentation for prediction
-            #predict_dataset = preprocess_training.createPreprocessedDataset()
-            #predict_dataset = preprocess_training.returnDataset()
 
             #### Initialize k means cluster #####
             deepcluster = clustering.__dict__["Kmeans"](self.NUM_CLUSTER)
@@ -165,9 +131,9 @@ class DeepCluster:
                                           outputs=model.layers[-3].output, name = model.name)
                     #print(model.summary())
 
-                predict_dataset = preprocess_training.createPreprocessedDataset()
+                predict_dataset = preprocess_training.createPreprocessedDataset(filename= KAGGLE_TRAIN)
                 # Compute features
-                features = compute_features(predict_dataset, model,train_data.shape[0])
+                features = compute_features(predict_dataset, model,num_samples)
 
                 # Get feature information
                 if self.verbose == 1:
@@ -197,17 +163,12 @@ class DeepCluster:
                 self.data_y_last = train_labels.copy()
 
                 # Update labels
-                updatecsvfile(train_labels)
-
-                train_labels = tf.keras.utils.to_categorical(train_labels, num_classes=self.NUM_CLUSTER, dtype='float32')
-                preprocess_training.updateLabels(train_labels)
+                updatecsvfile(KAGGLE_TRAIN,"deep_cluster_output.csv",train_labels)
 
                 # Make augmented training set
-                train_dataset = preprocess_training.createPreprocessedAugmentedDataset()
+                train_dataset = preprocess_training.createPreprocessedAugmentedDataset(filename = "deep_cluster_output.csv")
 
-                #train_dataset = preprocess_training.returnAugmentedDataset()
-
-                # Make model
+                # Add clasification layer and compile model
                 if network == "resnet":
                     x = tf.keras.layers.Dense(self.NUM_CLUSTER, activation='softmax')(model.output)
                     model = tf.keras.Model(inputs=model.input,outputs=x,name=model.name)
@@ -221,12 +182,8 @@ class DeepCluster:
                 # Train model
                 history = model.fit(train_dataset, steps_per_epoch= 30336 // 32, verbose = 1, epochs = 1)
 
-                saveloss = True
-
-                if saveloss == True:
-                    #print(history.history.keys())
-                    loss.append(history.history['loss'])
-
+                # Add loss information
+                loss.append(history.history['loss'])
 
                 end = time.time()
 
@@ -249,26 +206,19 @@ class DeepCluster:
 
                 # save cluster assignments
                 cluster_log.log(deepcluster.images_lists)
-            if not bof:
-                #Save model
-                saveWeights(model)
+            #Save model
+            saveWeights(model)
 
 
-        print("GET LOSS AND NMI SCORES FOR PLOTTING")
-        print(loss)
-        print(nmiscore)
+            print("GET LOSS AND NMI SCORES FOR PLOTTING")
+            print(loss)
+            print(nmiscore)
 
         ##### Get results #####
 
-        #Load visualization data
-
-        #preprocess_training = PreprocessingFromDataframe()
-        #validate_dataset, validate_labels = preprocess_training.createPreprocessedTestDataset()
-        #validate_data, _ = importKaggleTest(depth=1)
-        #preprocess_validate = Preprocessing(validate_data, validate_labels, dataset='Kaggle', num_classes = 5)
-        #validate_dataset = preprocess_validate.returnDataset()
-        validate_dataset, validate_labels = preprocess_training.createPreprocessedTestDataset()
-        validate_data = preprocess_training.returnImages()
+        validate_dataset = preprocess_training.createPreprocessedDataset(filename = KAGGLE_TEST)
+        validate_labels = preprocess_training.returnLabels(filename = KAGGLE_TEST)
+        validate_data = preprocess_training.returnImages(filename = KAGGLE_TEST)
 
 
         if network == "resnet":
@@ -424,7 +374,7 @@ def compute_features(dataset, model,N):
         if i <= (N//32 - 1):
             aux = model(input_tensor) #model(input_var).data.cpu().numpy()
         else:
-            print("yo")
+
             input_tensor = input_tensor[0:N-i* 32]
             aux = model(input_tensor)
             print(aux)
@@ -458,16 +408,16 @@ def compute_features(dataset, model,N):
     return features
 
 
-def updatecsvfile(labels):
+def updatecsvfile(filename,output_filename,labels):
 
     import csv
-    r = csv.reader(open('output.csv')) # Here your csv file
+    r = csv.reader(open(filename)) # Here your csv file
     lines = list(r)
 
     for i in range(len(lines)-1):
         lines[i+1][1] = [int(labels[i])]
 
-    with open('output.csv', 'w') as file:
+    with open(output_filename, 'w') as file:
         writer = csv.writer(file)
 
         for d in lines:

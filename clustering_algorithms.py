@@ -181,7 +181,7 @@ class ClusterAlgorithm:
 
 class KMeansCluster(ClusterAlgorithm):
     n_clusters = 5
-    n_init = 1000
+    n_init = 10000
 
     def __init__(self,n_clusters = 5, n_init = 100):
         self.n_clusters = n_clusters
@@ -193,7 +193,7 @@ class KMeansCluster(ClusterAlgorithm):
         Build the model
         :return: model
         '''
-        self.model = KMeans(max_iter = 10000, n_clusters=self.n_clusters, n_init=self.n_init)
+        self.model = KMeans(max_iter = 1000, n_clusters=self.n_clusters, n_init=self.n_init)
 
     def fit(self, X):
         return self.model.fit(X)

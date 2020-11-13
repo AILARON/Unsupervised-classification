@@ -18,7 +18,6 @@ DATA_GEN_ARGS = dict(#featurewise_center=True,
                  horizontal_flip = True,
                  vertical_flip = True,
                  #zca_whitening=True,
-
                  )
 
 # Arguments to perform data preprocessing in preprocessing pipeline
@@ -168,9 +167,10 @@ class PreprocessingFromDataframe(Preprocessing):
         self.predictgen.fit(data)
         self.traingen.fit(data)
 
-    def createPreprocessedDataset(self):
+    def createPreprocessedDataset(self,filename= ""):
         import pandas as pd
-        df=pd.read_csv(r"output.csv")
+        df=pd.read_csv(filename)
+        self.NUM_CLASSES = len(df.label.unique())
 
         train_generator= self.predictgen.flow_from_dataframe(dataframe=df, directory="", x_col="id", y_col="label", class_mode="categorical",
         target_size=(self.IMAGE_WIDTH,self.IMAGE_HEIGHT), batch_size=32, shuffle=False, color_mode='rgb', interpolation = "bilinear")
@@ -185,13 +185,10 @@ class PreprocessingFromDataframe(Preprocessing):
 
         return ds
 
-    def createPreprocessedAugmentedDataset(self):
+    def createPreprocessedAugmentedDataset(self, filename = ""):
         import pandas as pd
-        df=pd.read_csv(r"output.csv")
-        #df.columns = ['id',"label"]
-        #print(df.head())
-
-
+        df=pd.read_csv(filename)
+        self.NUM_CLASSES = len(df.label.unique())
 
         train_generator=self.traingen.flow_from_dataframe(dataframe=df, directory="", x_col="id", y_col="label", class_mode="categorical",
         target_size=(self.IMAGE_WIDTH,self.IMAGE_HEIGHT), batch_size=32, shuffle =True, color_mode='rgb', interpolation = "bilinear")
@@ -204,37 +201,11 @@ class PreprocessingFromDataframe(Preprocessing):
         )
         return ds
 
-    def createPreprocessedTestDataset(self):
-        import pandas as pd
-        df=pd.read_csv(r"test.csv")
-        #df.columns = ['id',"label"]
-        print(df.head())
-
-        labels = []
-        df2 = df.iloc[:, 1]
-        list = df2.to_numpy()
-        for val in list:
-            labels.append(int(val[1]))
-        labels = np.array(labels)
-
-
-        train_generator= self.predictgen.flow_from_dataframe(dataframe=df, directory="", x_col="id", y_col="label", class_mode="categorical",
-        target_size=(self.IMAGE_WIDTH,self.IMAGE_HEIGHT), batch_size=32, shuffle=False, color_mode='rgb', interpolation = "bilinear")
-
-        # Wrap the generator with tf.data
-        ds = tf.data.Dataset.from_generator(
-            lambda: train_generator,
-            output_types=(tf.float32, tf.float32),
-            output_shapes = ([None, self.IMAGE_WIDTH,self.IMAGE_HEIGHT,3],[None,5])
-        )
-
-        return ds, labels
-
-    def returnImages(self):
+    def returnImages(self, filename = ""):
         import pandas as pd
         from PIL import Image
 
-        df=pd.read_csv(r"test.csv")
+        df=pd.read_csv(filename)
         #df.columns = ['id',"label"]
         #print(df.head())
         images = []
@@ -247,9 +218,29 @@ class PreprocessingFromDataframe(Preprocessing):
 
         return data
 
-    def returnLabels(self):
+    def returnLabels(self, filename = ""):
         import pandas as pd
-        df=pd.read_csv(r"truelabels.csv")
+        df=pd.read_csv(filename)
+
+        labels = np.zeros(len(df.label),dtype='int')
+
+        for i, val in enumerate(df.label):
+            labels[i] = (int(val[1]))
+
+        return labels
+
+    def updateImageSize(self, image_width, image_height):
+        self.IMAGE_WIDTH = image_width
+        self.IMAGE_HEIGHT = image_height
+        return
+
+    def updateNumClasses(self,num):
+        self.NUM_CLASSES = num
+        return
+
+    def returnDatasetSize(self, filename = ""):
+        import pandas as pd
+        df=pd.read_csv(filename)
         #df.columns = ['id',"label"]
         print(df.head())
 
@@ -260,29 +251,24 @@ class PreprocessingFromDataframe(Preprocessing):
             labels.append(int(val[1]))
         labels = np.array(labels)
 
-        return labels
-
-    def updateImageSize(self, image_width, image_height):
-        self.IMAGE_WIDTH = image_width
-        self.IMAGE_HEIGHT = image_height
-        return
+        return labels.shape[0]
 
 
 def get_label(file_path, classes):
     parts = file_path.split('/')
     return parts[-2] == classes
 
-def makeCSVFile(path, split = 0):
+def makeCSVFile(path, filename = '',output_filename = '',   split = 0):
     import os
     import csv
     import pathlib
     import glob
 
     # Returns a list of names in list files.
-    files = glob.glob('dataset/kaggletrainoriginalfull//**/*.jpg',
+    files = glob.glob(filename+'//**/*.jpg',
                        recursive = True)
 
-    filepath = pathlib.Path("dataset/kaggletrainoriginalfull/")
+    filepath = pathlib.Path(filename+"/")
 
     data = []
     labels = []
@@ -295,7 +281,7 @@ def makeCSVFile(path, split = 0):
         labels.append(label)
 
     if split == 0:
-        with open('truelabels.csv', 'w') as file:
+        with open(output_filename, 'w') as file:
             writer = csv.writer(file)
             writer.writerow(["id","label"])
             for d in data:

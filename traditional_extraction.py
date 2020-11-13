@@ -22,7 +22,7 @@ from clustering_algorithms import *
 
 import tensorflow as tf
 import scipy.spatial.distance as ssd
-from load_dataset import importKaggleTest, importAilaronTest
+from load_dataset import importKaggle, importAilaron
 import cv2
 
 def calculate_distances(input_data, desc ='SIFT', image_type = "rgb"):

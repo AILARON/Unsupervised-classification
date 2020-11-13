@@ -157,7 +157,7 @@ def printOutput(data):
         cv2.imwrite("output_gradcam.png",vstack)
 
 from deep_neural_networks import VGG_BATCHNORM, RESNET101,RESNET50, COAPNET, RESNET, BOF_MODELS
-from load_dataset import importWHOI, importKaggleTrain, importKaggleTest
+from load_dataset import importWHOI, importKaggle
 
 def grad():
     model = RESNET50(input_shape=(224,224,3),output_shape = 200)
@@ -168,7 +168,7 @@ def grad():
     data = np.array([cv2.resize(img, dsize=(224,224), interpolation=cv2.INTER_LINEAR) for img in (train_data[0:32])])
 
     orig = data[0].copy()
-    
+
     orig=np.stack([orig]*3, axis=-1)
     orig = orig.reshape(224,224,3)
 

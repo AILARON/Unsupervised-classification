@@ -1,7 +1,7 @@
 
 
 
-from load_dataset import importKaggleTrain, importKaggleTest, importLuoTraining, importPastoreTraining, importAilaronTraining
+from load_dataset import importKaggle, importLuoTraining, importPastoreTraining, importAilaron
 import numpy as np
 
 AILARON_CLASSES =  ['copepod','diatom_chain','other','faecal_pellets','bubble','oily_gas','oil',""]
@@ -79,7 +79,7 @@ class data_info():
         plt.grid(axis='y', alpha=0.75)
         plt.xlabel('Plankton species')
         plt.ylabel('Number of species')
-        plt.title('Samples in Ailaron dataset')
+        plt.title('Samples in Kaggle dataset')
 
         #Change colors >> high freq labels are red
         maxfreq = n.max()
@@ -93,12 +93,12 @@ class data_info():
         xticks = [i for i in range(self.num_classes +1)]
 
         # also define the labels we'll use (note this MUST have the same size as `xticks`!)
-        xtick_labels = [f for f in AILARON_CLASSES]
+        #xtick_labels = [f for f in AILARON_CLASSES]
 
         # add the ticks and labels to the plot
         plt.xticks(rotation='vertical')
-        axs.set_xticks(xticks)
-        axs.set_xticklabels(xtick_labels)
+        #axs.set_xticks(xticks)
+        #axs.set_xticklabels(xtick_labels)
 
         plt.savefig('foo.png')
 
@@ -113,7 +113,7 @@ class data_info():
         return [max(values),min(values)]
 
     def data_statistics(self):
-        self.data, self.labels = importAilaronTraining(depth=1)
+        self.data, self.labels = importKaggle(train = False)
 
 
 
@@ -127,7 +127,7 @@ class data_info():
         train_data = self.data #np.array([cv2.resize(img, dsize=(64, 64), interpolation=cv2.INTER_LINEAR ) for img in (self.data)])
 
 
-        visualize_input(train_data[10:50])
+        #visualize_input(train_data[10:50])
 
         print("Min width, max width, min height, max height")
         print( self.max_min_image_size())
