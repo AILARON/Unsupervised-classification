@@ -53,6 +53,14 @@ def importAilaron(train = True):
         loader = LoadDatasetTIFF(AILARONTEST)
     return loader.load_data()
 
+def importKaggleOld(train=True):
+    if train:
+        loader = LoadDatasetOld(KAGGLE_ORIGINAL_TRAIN)
+        return loader.load_data(KAGGLE_ORIGINAL_TRAIN)
+    else:
+        loader = LoadDatasetOld(KAGGLE_ORIGINAL_TEST)
+        return loader.load_data(KAGGLE_ORIGINAL_TEST)
+    return
 class LoadDataset:
     data_dir = None
     list_ds = None
@@ -242,7 +250,7 @@ class LoadDatasetTIFF():
 
 
 ### Similar class to load dataset, but for tf 1.x ###
-class LoadDatasetOLD():
+class LoadDatasetOld():
     data_dir = None
     list_ds = None
 
@@ -258,7 +266,7 @@ class LoadDatasetOLD():
 
     SAVE = False
 
-    def __init__(self,data_dir,test_size,configure_for_performance,height = 64,width = 64, depth =1 ):
+    def __init__(self,data_dir,height = 64,width = 64, depth =1 ):
         self.data_dir = pathlib.Path(data_dir)
 
         if (data_dir.find('kaggle') != -1):
@@ -274,8 +282,8 @@ class LoadDatasetOLD():
         print("found ",self.CLASS_NAMES," classes")
 
         self.list_ds = tf.data.Dataset.list_files(str(self.data_dir/'*/*'))
-        self.CONFIGURE_FOR_PERFORMANCE = configure_for_performance
-        self.TEST_SIZE = test_size
+
+
         self.IMG_HEIGHT = height
         self.IMG_WIDTH = width
         self.IMG_DEPTH = depth
@@ -326,6 +334,29 @@ class LoadDatasetOLD():
     def get_list_ds(self):
         return self.list_ds
 
+
+
+def loadFromDataFrame(filename= ""):
+    import pandas as pd
+    from PIL import Image
+
+    df=pd.read_csv(filename)
+
+    print(len(df.index))
+
+    images = []
+    labels = np.zeros(len(df.label),dtype='int')
+    for index, row in df.iterrows():
+        img = np.array(Image.open(row['id']),dtype=np.float32)
+        images.append(img)
+
+    for i, val in enumerate(df.label):
+        labels[i] = (int(val[1]))
+
+    return images, labels
+
+
+
 def get_label(file_path, classes):
     parts = file_path.split('/')
     return parts[-2] == classes
@@ -371,9 +402,9 @@ def createCSVFile(filename,output_filename,drop_class = False):
     return
 
 
-def checkCSVFile():
+def checkCSVFile(filename):
     import pandas as pd
-    df=pd.read_csv(r"csvloadfiles/kaggle_original_train.csv")
+    df=pd.read_csv(filename)
     df.columns = ['id',"label"]
     print(df.head())
 

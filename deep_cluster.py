@@ -34,9 +34,10 @@ from deep_neural_networks import VGG_BATCHNORM, RESNET101,RESNET50, COAPNET, RES
 from load_dataset import importWHOI, importKaggle
 
 #CSV load files
-KAGGLE_TRAIN = 'csvloadfiles/kaggle_missing.csv'
+KAGGLE_TRAIN = 'csvloadfiles/kaggle_original.csv'
 KAGGLE_TEST = 'csvloadfiles/kaggle_five_classes.csv'
-
+KAGGLE_MISSING = 'csvloadfiles/kaggle_missing.csv'
+KAGGLE_MISSING_TEST = 'csvloadfiles/kaggle_missing_five.csv'
 
 class DeepCluster:
     data_x = None
@@ -56,16 +57,16 @@ class DeepCluster:
         #self.data_x = x
         #self.data_y = y
 
-    def train(self,arch = 1):
+    def train(self,arch = 1, initialize_previous = False, imagefile = KAGGLE_TRAIN,name = 0):
         network_archs = ["coapnet","vgg","resnet"]
         network = network_archs[arch]
 
-        initialize_previous = False
+
 
         if network == "vgg":
             if initialize_previous == True:
                 model = VGG_BATCHNORM(input_shape=self.input_shape,output_shape = self.NUM_CLUSTER)
-                model = loadWeights(model)
+                model = loadWeights(model,name)
             else:
                 model = VGG_BATCHNORM(input_shape=self.input_shape,output_shape = self.NUM_CLUSTER)
 
@@ -99,14 +100,17 @@ class DeepCluster:
 
         ##### Preprocessing #####
 
+        preprocess_training = PreprocessingFromDataframe(train_data,dataset='Kaggle',
+         num_classes = self.NUM_CLUSTER,input_shape = self.input_shape)
+        true_labels = preprocess_training.returnLabels(imagefile)
+        num_samples =  preprocess_training.returnDatasetSize(imagefile)
+
         #make training labels
-        labels = np.zeros(30336)
+        labels = np.zeros(num_samples)
         self.data_y_last= labels.copy()
 
-        preprocess_training = PreprocessingFromDataframe(train_data,labels,dataset='Kaggle', num_classes = self.NUM_CLUSTER)
-        true_labels = preprocess_training.returnLabels(KAGGLE_TRAIN)
-        num_samples =  preprocess_training.returnDatasetSize(KAGGLE_TRAIN)
-
+        print(true_labels.shape)
+        print(num_samples)
 
         if initialize_previous == False:
 
@@ -131,13 +135,13 @@ class DeepCluster:
                                           outputs=model.layers[-3].output, name = model.name)
                     #print(model.summary())
 
-                predict_dataset = preprocess_training.createPreprocessedDataset(filename= KAGGLE_TRAIN)
+                predict_dataset = preprocess_training.createPreprocessedDataset(filename= imagefile)
                 # Compute features
                 features = compute_features(predict_dataset, model,num_samples)
 
                 # Get feature information
                 if self.verbose == 1:
-                    print(features, features.shape,features.dtype)
+                    #print(features, features.shape,features.dtype)
                     print('features min=%.3f, max=%.3f' % (features.min(), features.max()))
 
                 # Cluster features
@@ -154,7 +158,7 @@ class DeepCluster:
 
                     print(self.data_y_last[0:20])
 
-                    from sklearn.metrics.cluster import normalized_mutual_info_score
+                    #from sklearn.metrics.cluster import normalized_mutual_info_score
                     print("NMI old vs new = ", normalized_mutual_info_score(train_labels,self.data_y_last))
                     print("NMI new vs true = ", normalized_mutual_info_score(train_labels,true_labels))
                     nmiscore.append(normalized_mutual_info_score(train_labels,self.data_y_last))
@@ -163,7 +167,7 @@ class DeepCluster:
                 self.data_y_last = train_labels.copy()
 
                 # Update labels
-                updatecsvfile(KAGGLE_TRAIN,"deep_cluster_output.csv",train_labels)
+                updatecsvfile(imagefile,"deep_cluster_output.csv",train_labels)
 
                 # Make augmented training set
                 train_dataset = preprocess_training.createPreprocessedAugmentedDataset(filename = "deep_cluster_output.csv")
@@ -180,7 +184,7 @@ class DeepCluster:
                 model.compile(optimizer=optimizer, loss=tf.keras.losses.CategoricalCrossentropy(), metrics=['accuracy'])
 
                 # Train model
-                history = model.fit(train_dataset, steps_per_epoch= 30336 // 32, verbose = 1, epochs = 1)
+                history = model.fit(train_dataset, steps_per_epoch= 30236 // 32, verbose = 1, epochs = 1)
 
                 # Add loss information
                 loss.append(history.history['loss'])
@@ -207,7 +211,7 @@ class DeepCluster:
                 # save cluster assignments
                 cluster_log.log(deepcluster.images_lists)
             #Save model
-            saveWeights(model)
+            saveWeights(model,name)
 
 
             print("GET LOSS AND NMI SCORES FOR PLOTTING")
@@ -216,9 +220,9 @@ class DeepCluster:
 
         ##### Get results #####
 
-        validate_dataset = preprocess_training.createPreprocessedDataset(filename = KAGGLE_TEST)
-        validate_labels = preprocess_training.returnLabels(filename = KAGGLE_TEST)
-        validate_data = preprocess_training.returnImages(filename = KAGGLE_TEST)
+        validate_dataset = preprocess_training.createPreprocessedDataset(filename = KAGGLE_MISSING)
+        validate_labels = preprocess_training.returnLabels(filename = KAGGLE_MISSING)
+        validate_data = preprocess_training.returnImages(filename = KAGGLE_MISSING)
 
 
         if network == "resnet":
@@ -233,9 +237,6 @@ class DeepCluster:
         # Extract features
         features = compute_features(validate_dataset, model,validate_data.shape[0])
 
-        from clustering import preprocess_features
-        #features = preprocess_features(features)
-
         if self.verbose == 1:
             print(features, features.shape,features.dtype)
 
@@ -243,37 +244,75 @@ class DeepCluster:
         os.makedirs(os.path.join(str("deepcluster_"+network_archs[arch])), exist_ok=True)
 
         #move into save dir
-        os.chdir(str("deepcluster_"+network_archs[arch]))
+        #os.chdir(str("deepcluster_"+network_archs[arch]))
 
         #Predict using K-means
         print("KMEANS CLUSTERING")
-        kmean = KMeansCluster(n_clusters = 5)
+        kmean = KMeansCluster(n_clusters = 108)
         kmean.fit(features)
         k_means_labels = sortLabels(validate_labels,kmean.predict(features))
         kmean.performance(validate_labels,k_means_labels)
 
+        print("NMI new vs true = ", normalized_mutual_info_score(validate_labels,k_means_labels))
+
         print("SPECTRAL CLUSTERING")
         #Predict using SpectralClustering
-        spectral = SpectralCluster(n_clusters = 5)
+        spectral = SpectralCluster(n_clusters = 108)
         spectral_labels  = sortLabels(validate_labels,spectral.predict(features))
         spectral.performance(validate_labels,spectral_labels)
 
+        print("NMI new vs true = ", normalized_mutual_info_score(validate_labels,spectral_labels))
+
+
+        #Move back to prev dir
+        #os.chdir("../")
+        ##### Get results #####
+
+        validate_dataset = preprocess_training.createPreprocessedDataset(filename = KAGGLE_TRAIN)
+        validate_labels = preprocess_training.returnLabels(filename = KAGGLE_TRAIN)
+        validate_data = preprocess_training.returnImages(filename = KAGGLE_TRAIN)
+
+        #os.chdir(str("deepcluster_"+network_archs[arch]))
+        # Extract features
+        features = compute_features(validate_dataset, model,validate_data.shape[0])
+
+        #Predict using K-means
+        print("KMEANS CLUSTERING")
+        kmean = KMeansCluster(n_clusters = 121)
+        kmean.fit(features)
+        k_means_labels = sortLabels(validate_labels,kmean.predict(features))
+        kmean.performance(validate_labels,k_means_labels)
+
+        print("NMI new vs true = ", normalized_mutual_info_score(validate_labels,k_means_labels))
+
+        print("SPECTRAL CLUSTERING")
+        #Predict using SpectralClustering
+        spectral = SpectralCluster(n_clusters = 121)
+        spectral_labels  = sortLabels(validate_labels,spectral.predict(features))
+        spectral.performance(validate_labels,spectral_labels)
+
+        print("NMI new vs true = ", normalized_mutual_info_score(validate_labels,spectral_labels))
+
+
+
+
+        '''
         print("BIRCH CLUSTERING")
         #Predict using SpectralClustering
-        birch = BIRCHCluster(n_clusters = 5)
+        birch = BIRCHCluster(n_clusters = 121)
         birch.fit(features)
         birch_labels  = sortLabels(validate_labels,birch.predict(features))
         birch.performance(validate_labels,birch_labels)
 
         print("DBSCAN CLUSTERING")
         #Predict using SpectralClustering
-        dbscan = DBSCANCluster(n_clusters = 5)
+        dbscan = DBSCANCluster(n_clusters = 121)
         dbscan_labels  = sortLabels(validate_labels,dbscan.predict(features))
         dbscan.performance(validate_labels,dbscan_labels)
 
         print("Gaussian CLUSTERING")
         #Predict using SpectralClustering
-        gaussian = GaussianMixtureCluster(n_clusters = 5)
+        gaussian = GaussianMixtureCluster(n_clusters = 121)
         gaussian.fit(features)
         gaussian_labels  = sortLabels(validate_labels,gaussian.predict(features))
         gaussian.performance(validate_labels,gaussian_labels)
@@ -299,8 +338,10 @@ class DeepCluster:
         PCA.pca_plot(validate_data,k_means_labels,"pca"+str(network)+"kmeans","baseline")
         PCA.pca_plot(validate_data,spectral_labels,"pca"+str(network)+"spectral","baseline")
 
+        '''
+
         #Move back to prev dir
-        os.chdir("../")
+        #os.chdir("../")
 
 
 class Logger(object):
@@ -319,19 +360,19 @@ class Logger(object):
             pickle.dump(self.data, fp, -1)
 
 
-def saveWeights(model):
+def saveWeights(model,name):
     # Save JSON config to disk
     json_config = model.to_json()
     with open('model_config.json', 'w') as json_file:
         json_file.write(json_config)
         # Save weights to disk
         print("[Info] saving weights")
-        model.save_weights(str(model.name)+"_"+"baseline"+'_weights.h5')
+        model.save_weights(str(model.name)+'_'+str(name)+"_"+"baseline"+'_weights.h5')
 
-def loadWeights(model):
+def loadWeights(model,name):
     print("[Info] loading previous weights")
     try:
-        model.load_weights(str(model.name)+"_"+"baseline"+'_weights.h5')
+        model.load_weights(str(model.name)+"_"+str(name)+"_"+"baseline"+'_weights.h5')
     except:
         print("Could not load weights")
 

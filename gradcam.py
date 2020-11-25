@@ -131,7 +131,7 @@ def gradImage(model,image):
     heatmap = cam.compute_heatmap(image)
     # resize the resulting heatmap to the original input image dimensions
     # and then overlay heatmap on top of the image
-    heatmap = cv2.resize(heatmap, (224, 224))
+    heatmap = cv2.resize(heatmap, (128, 128))
     (heatmap, output) = cam.overlay_heatmap(heatmap, orig, alpha=0.5)
 
     return output
@@ -157,29 +157,61 @@ def printOutput(data):
         cv2.imwrite("output_gradcam.png",vstack)
 
 from deep_neural_networks import VGG_BATCHNORM, RESNET101,RESNET50, COAPNET, RESNET, BOF_MODELS
-from load_dataset import importWHOI, importKaggle
+from load_dataset import importWHOI, importKaggle, importKaggleOld
+
+from tensorflow.keras import layers
+
+def make_discriminator_model():
+    model = tf.keras.Sequential( name='discriminator')
+    model.add(layers.Conv2D(64, (5, 5), strides=(2, 2), padding='same',
+                                     input_shape=[128, 128, 3]))
+    model.add(layers.LeakyReLU())
+    model.add(layers.Dropout(0.3))
+
+    model.add(layers.Conv2D(128, (5, 5), strides=(2, 2), padding='same'))
+    model.add(layers.LeakyReLU())
+    model.add(layers.Dropout(0.3))
+
+    model.add(layers.Conv2D(256, (5, 5), strides=(2, 2), padding='same'))
+    model.add(layers.LeakyReLU())
+    model.add(layers.Dropout(0.3))
+
+    model.add(layers.Conv2D(512, (5, 5), strides=(1, 1), padding='same'))
+    model.add(layers.LeakyReLU())
+    model.add(layers.Dropout(0.3))
+
+    model.add(layers.Flatten())
+
+    model.add(layers.Dense(256))
+    model.add(layers.LeakyReLU())
+    model.add(layers.Dropout(0.3))
+
+    model.add(layers.Dense(1))
+
+    return model
 
 def grad():
-    model = RESNET50(input_shape=(224,224,3),output_shape = 200)
-    model = loadWeights(model)
+    model = make_discriminator_model()
+    model = loadWeights(model,"discriminator")
 
-    train_data, _ = importKaggleTrain(depth=1)
+    train_data, _ = importKaggleOld(train = True)
     import cv2
-    data = np.array([cv2.resize(img, dsize=(224,224), interpolation=cv2.INTER_LINEAR) for img in (train_data[0:32])])
 
-    orig = data[0].copy()
+    list = [16403,4953,29872,7892,23613,1747,19272,17585,21178]
+    img = []
+    #for i in range(16):
+    #    list.append(randint(0,30000))
+    for i, val in enumerate(list):
+        img.append(train_data[val])
 
-    orig=np.stack([orig]*3, axis=-1)
-    orig = orig.reshape(224,224,3)
 
-    orig = orig.astype("uint8")
-    print(orig.shape)
+    data = np.array([cv2.resize(img, dsize=(128,128), interpolation=cv2.INTER_LINEAR) for img in (img)])
 
     images = []
-    for i in range(10):
+    for i in range(9):
         orig = data[i].copy()
         orig=np.stack([orig]*3, axis=-1)
-        orig = orig.reshape(224,224,3)
+        orig = orig.reshape(128,128,3)
         orig = orig.astype("uint8")
 
         images.append(gradImage(model,orig))
@@ -233,10 +265,10 @@ def grad():
     cv2.imwrite("output_gradcam"+".png", output)
     #cv2.waitKey(0)
     """
-def loadWeights(model):
+def loadWeights(model,name):
     print("[Info] loading previous weights")
     try:
-        model.load_weights(str(model.name)+"_"+"baseline"+'_weights.h5')
+        model.load_weights(name+'_weights.h5')
     except:
         print("Could not load weights")
 

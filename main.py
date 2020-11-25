@@ -38,22 +38,34 @@ if __name__=="__main__":
 
     from load_dataset import createCSVFile, checkCSVFile
 
-    #createCSVFile('kaggle_original','kaggle_missing',drop_class = True)
-    #checkCSVFile()
+    #createCSVFile('kaggle_five_classes','kaggle_five_classes_missing',drop_class = True)
+    #checkCSVFile(kaggle_missing)
     #os.exit()
 
     from gradcam import grad
     from bof_model import example
-    from gan import dcGan
-    from dcgan import gan
+
+    from gan import GAN
     from cgan import cGan
     from mnistgan import gan
     from preprocessing import makeCSVFile
     from baseline import neuralNetwork
     from traditional_extraction import traditionalExtraction
     from get_dataset_info import data_info
+    from size_experiment import network
+
+    #grad()
+    #sys.exit()
 
     model = "DC"
+
+    if model == "rotation_invariant":
+        from rot_inv_autoencoder import RotationInvariantAutoencoder
+        auto = RotationInvariantAutoencoder()
+        for i in range(5):
+            auto.train(name = i)
+            auto.test(name = i)
+
 
     if model == "data_statistics":
 
@@ -65,11 +77,16 @@ if __name__=="__main__":
     if model == "neuralNetwork":
         neuralNetwork(1)
 
+    if model == "network":
+        network()
 
     if model == "DC":
-        DeepCluster().train(1)
+        for i in range(5):
+            DeepCluster().train(1, initialize_previous = False,name = i)
 
-
-
+    if model == "gan":
+        model = GAN()
+        model.train_gan()
+        model.test_gan()
 
     ############################################################################

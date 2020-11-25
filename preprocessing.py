@@ -1,4 +1,19 @@
+##################
+#Tensorflow-keras based implementation of DeepCluster
+#Using VGG16, 5Conv and ResNet as feature extractor
 
+#This file is based on the Caron et al. DeepCluster from the following GitHub
+#https://github.com/facebookresearch/deepcluster
+
+#Note 1. that the code is changed from a pytorch implementation to a tensorflow implementation.
+#Performance might therefore differ.
+
+#Note 2. For an easy walkthrough see https://amitness.com/2020/04/deepcluster/
+
+"""
+Input: 1. arch: which model architecture to use: 5Conv, VGG16 or ResNet152
+"""
+##################
 
 
 
@@ -35,18 +50,18 @@ class Preprocessing():
     IMAGE_HEIGHT = 64
     IMAGE_DEPTH = 3
     NUM_CLASSES = 200
-
+    AUTOENCODER = False
 
     data = None
     label = None
 
 
-    def __init__(self, data, label,dataset='Kaggle', num_classes = 121,image_width = 64, image_height = 64):
+    def __init__(self, data, label,dataset='Kaggle', num_classes = 121,input_shape = (64,64,3), autoencoder = False):
             self.DATASET = dataset
             self.NUM_CLASSES = num_classes
-            self.IMAGE_WIDTH = image_width
-            self.IMAGE_HEIGHT = image_height
-
+            self.IMAGE_WIDTH = input_shape[0]
+            self.IMAGE_HEIGHT = input_shape[1]
+            self.AUTOENCODER = autoencoder
             if dataset == 'Ailaron':
                 self.IMAGE_WIDTH = 64
                 self.IMAGE_HEIGHT = 64
@@ -68,9 +83,11 @@ class Preprocessing():
             #Make data type float 32
             data = data.astype(np.float32)
             #Center data
-            data = data - data.mean()
-            #Make data between 0-1 ##NOTICED THAT THIS SPEEDS UP TRAINING##
-            data = data/255
+            #data = data - data.mean()
+            #Make data between [-1-1] ##NOTICED THAT THIS SPEEDS UP TRAINING##
+            #data = data/255
+            data = (data - 127.5) / 127.5
+
             #Make depth = 3
             data=np.stack([data]*3, axis=-1)
             data = data.reshape(-1, self.IMAGE_WIDTH,self.IMAGE_HEIGHT,self.IMAGE_DEPTH)
@@ -83,9 +100,13 @@ class Preprocessing():
             #Make data between 0-1 ##NOTICED THAT THIS SPEEDS UP TRAINING##
             data = data/255
 
-        self.data = data
-        self.label = label
+        if self.AUTOENCODER:
+            self.data = data
+            self.label = data
 
+        else:
+            self.data = data
+            self.label = label
         from utils import visualize_input
         #visualize_input(data[0:16])
 
@@ -108,6 +129,11 @@ class Preprocessing():
             #subset=None,
             )
 
+        if tf.__version__== '1.15.0':
+            print('yo')
+            return gen
+
+        print('no')
         # Wrap the generator with tf.data
         ds = tf.data.Dataset.from_generator(
             lambda: gen,
@@ -119,22 +145,31 @@ class Preprocessing():
     def returnImages(self):
         return self.data
 
+    def returnTrainDataset(self):
+        return tf.data.Dataset.from_tensor_slices((self.data, self.label)).batch(32).shuffle(60000)
+
     def returnDataset(self):
+        if tf.__version__== '1.15.0':
+            return self.data
+
         return tf.data.Dataset.from_tensor_slices((self.data, self.label)).batch(32)
 
     def updateLabels(self,label):
         self.label = label
+
+    def shape(self):
+        return self.data.shape
 
 class PreprocessingFromDataframe(Preprocessing):
     predictgen = None
     traingen = None
 
 
-    def __init__(self,data, label,dataset='Kaggle', num_classes = 121, image_width = 64, image_height = 64):
+    def __init__(self,data,dataset='Kaggle', num_classes = 121, input_shape=(64,64,3)):
             self.DATASET = dataset
             self.NUM_CLASSES = num_classes
-            self.IMAGE_WIDTH = image_width
-            self.IMAGE_HEIGHT = image_height
+            self.IMAGE_WIDTH = input_shape[0]
+            self.IMAGE_HEIGHT = input_shape[1]
 
 
             if dataset == 'Ailaron':
@@ -252,6 +287,11 @@ class PreprocessingFromDataframe(Preprocessing):
         labels = np.array(labels)
 
         return labels.shape[0]
+
+    def shape(self):
+        return
+
+
 
 
 def get_label(file_path, classes):

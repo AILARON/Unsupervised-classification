@@ -174,6 +174,29 @@ class ClusterAlgorithm:
         print("F1 Score: {}%".format(100 * f1score))
         return accuracy, precision, recall, f1score
 
+    def sortLabels(self,y_true,y_pred):
+        print(y_pred.shape)
+        #from sklearn.utils.linear_assignment_ import linear_assignment
+        from scipy.optimize import linear_sum_assignment as linear_assignment
+
+        y_true = y_true.astype(np.int64)
+        y_pred = y_pred.astype(np.int64)
+        D = max(y_pred.max(), y_true.max()) + 1
+        w = np.zeros((D, D), dtype=np.int64)
+
+        # Confusion matrix.
+        for i in range(y_pred.size):
+            w[y_pred[i], y_true[i]] += 1
+        ind = linear_assignment(-w)
+
+        new_pred = np.zeros(len(y_pred), dtype=np.int64)
+        for i in range(len(y_pred)):
+            new_pred[i] = ind[1][y_pred[i]]
+
+        print(new_pred.shape)
+        return new_pred
+
+
     def build_model(self):
         pass
 

@@ -26,6 +26,7 @@ def neuralNetwork(arch):
     network_archs = ["coapnet","vgg","resnet"]
     network = network_archs[arch]
 
+
     initialize_previous = False
 
     if network == "vgg":
@@ -34,7 +35,7 @@ def neuralNetwork(arch):
             model = loadWeights(model)
 
         else:
-            model = VGG_BATCHNORM()
+            model = VGG_BATCHNORM(input_shape=(110,110,3),output_shape = 121)
 
     if network == "coapnet":
         if initialize_previous == True:
@@ -68,7 +69,7 @@ def neuralNetwork(arch):
     print(model.summary())
 
     #load training data
-    train_data, train_labels = importKaggleTrain(depth=1)
+    train_data, train_labels = importKaggle()
     train_labels = tf.keras.utils.to_categorical(train_labels, num_classes=121, dtype='float32')
 
     print(train_labels.shape)
@@ -76,7 +77,7 @@ def neuralNetwork(arch):
 
 
     #Load visualization data
-    visualize_data, visualize_labels = importKaggleTest(depth=1)
+    visualize_data, visualize_labels = importKaggle(train = False)
     #visualize_labels = tf.keras.utils.to_categorical(visualize_labels, num_classes=121, dtype='float32')
 
     #visualize_data = visualize_data[0:100]
@@ -135,9 +136,9 @@ def neuralNetwork(arch):
     from preprocessing import Preprocessing
 
 
-    train_dataset = Preprocessing(train_data, train_label).returnAugmentedDataset()
-    test_dataset = Preprocessing(test_data, test_label).returnDataset()
-    visualize_dataset = Preprocessing(visualize_data, visualize_labels).returnDataset()
+    train_dataset = Preprocessing(train_data, train_label,image_width = 110, image_height = 110).returnAugmentedDataset()
+    test_dataset = Preprocessing(test_data, test_label,image_width = 110, image_height = 110).returnDataset()
+    visualize_dataset = Preprocessing(visualize_data, visualize_labels,image_width = 110, image_height = 110).returnDataset()
 
 
     #Early stopping criterion
@@ -149,10 +150,11 @@ def neuralNetwork(arch):
         #Train model
         #model.fit(train_dataset,validation_data =test_dataset,steps_per_epoch=int(math.ceil(1. * train_data.shape[0] / 32)),
         #validation_steps=int(math.ceil(1. * test_data.shape[0] / 32)),verbose = 1, callbacks =[stopping],epochs = 200)
-        model.fit(train_dataset,validation_data =test_dataset, steps_per_epoch= train_data.shape[0] // 32,
+        history = model.fit(train_dataset,validation_data =test_dataset, steps_per_epoch= train_data.shape[0] // 32,
         validation_steps= test_data.shape[0] // 32, verbose = 1, callbacks =[stopping], epochs = 30)
         #Save model
         saveWeights(model)
+
 
     #Remove softmax layer
     output = model.layers[-2].output
