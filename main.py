@@ -32,6 +32,7 @@ if gpu == 1:
     tf.config.experimental.set_memory_growth(physical_devices[0], True)
     #tf.config.experimental.set_memory_growth(physical_devices[1], True)
 
+print(tf.__version__)
 
 if __name__=="__main__":
     tf.keras.backend.clear_session()
@@ -53,11 +54,21 @@ if __name__=="__main__":
     from traditional_extraction import traditionalExtraction
     from get_dataset_info import data_info
     from size_experiment import network
-
+    from classification import ClusterModels
     #grad()
     #sys.exit()
 
     model = "DC"
+
+    if model == "classification":
+        ClusterModels().dec(model = 'DC')
+
+        print(tf.__version__)
+        if tf.__version__ == '1.15.0':
+            from rot_inv_autoencoder import RotationInvariantAutoencoder
+            ClusterModels().testAuto()
+        else:
+            ClusterModels().testDC()
 
     if model == "rotation_invariant":
         from rot_inv_autoencoder import RotationInvariantAutoencoder
@@ -76,12 +87,15 @@ if __name__=="__main__":
 
     if model == "neuralNetwork":
         neuralNetwork(1)
+        #for i in range(3):
+        #    neuralNetwork(i)
 
     if model == "network":
         network()
 
     if model == "DC":
         for i in range(5):
+        #from test import DeepCluster
             DeepCluster().train(1, initialize_previous = False,name = i)
 
     if model == "gan":

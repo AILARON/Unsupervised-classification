@@ -36,7 +36,7 @@ from sklearn.decomposition import PCA
 from sklearn.cluster import Birch
 
 #DBSCAN
-from sklearn.cluster import DBSCAN
+from sklearn.cluster import DBSCAN,OPTICS
 
 #Gaussian mixture
 from sklearn.mixture import GaussianMixture
@@ -204,7 +204,7 @@ class ClusterAlgorithm:
 
 class KMeansCluster(ClusterAlgorithm):
     n_clusters = 5
-    n_init = 10000
+    n_init = 100
 
     def __init__(self,n_clusters = 5, n_init = 100):
         self.n_clusters = n_clusters
@@ -288,7 +288,7 @@ class DBSCANCluster(ClusterAlgorithm):
         Build the model
         :return: model
         '''
-        self.model = model = DBSCAN(eps=0.1, min_samples=500)
+        self.model = model = DBSCAN(eps=35)
 
     def fit(self, X):
         return self.model.fit(X)
@@ -352,14 +352,14 @@ class PCAAlgo():
     def __init__(self):
         return
 
-    def pca_fit(self, X):
+    def pca_fit(self, X, n_components=2):
         x = StandardScaler().fit_transform(X)
         #time_start = time()
         RS = 123
-        self.pca = PCA(n_components=2,copy=True, svd_solver='auto',
+        self.pca = PCA(n_components=n_components,copy=True, svd_solver='auto',
         iterated_power='auto').fit_transform(x)
 
-        return
+        return 
 
     def pca_plot(self, input_data, labels, save_name = "pca", save_data_dir = "pca_plot"):
         imgHeight = 64

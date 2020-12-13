@@ -155,6 +155,15 @@ class RotationInvariantAutoencoder():
         plt.savefig('autoencoder.png')
         plt.close()
 
+        fig = plt.figure(figsize=(4,4))
+        for i in range(16):
+            plt.subplot(4, 4, i+1)
+            plt.imshow(data[i, :, :, 0] * 127.5 + 127.5, cmap='gray')
+            plt.axis('off')
+
+        plt.savefig('real_autoencoder.png')
+        plt.close()
+
 
     def train(self,name = ''):
         autoencoder, encoder, decoder = self.autoencoder_architecture(network = 'autoencoder')
@@ -167,7 +176,7 @@ class RotationInvariantAutoencoder():
         print('Finished compiling')
 
         #train_images, train_images = importKaggleOld()
-        train_images,train_labels = loadFromDataFrame(KAGGLE_TRAIN)
+        train_images,train_labels = loadFromDataFrame(KAGGLE_MISSING)
         X_train, X_test, y_train, y_test = train_test_split(train_images, train_labels, test_size=0.1, random_state=42)
 
         pre_train = Preprocessing(X_train,y_train,autoencoder = True)
@@ -189,7 +198,7 @@ class RotationInvariantAutoencoder():
         self.plot(autoencoder, validation_data)
 
         print('saving weights')
-        saveWeights(encoder,str(savename))
+        saveWeights(encoder,str(name))
 
     def test(self,name = ''):
 
@@ -199,7 +208,7 @@ class RotationInvariantAutoencoder():
         test_set = Preprocessing(train_images,train_labels,autoencoder = True).returnImages()
 
         autoencoder, encoder, decoder = self.autoencoder_architecture(network = 'autoencoder')
-        loadWeights(encoder,str(0))
+        loadWeights(encoder,name)
 
         def getRandom(data):
             list = [16403,4953,29872,7892,23613,1747,19272,17585,21178]
@@ -236,6 +245,15 @@ class RotationInvariantAutoencoder():
         TSNE.tsne_fit(features,perplexity = 35)
 
 
-        #TSNE.tsne_plot(images_black_and_white,train_labels,"baseline","baseline")
-        #TSNE.tsne_plot(images_black_and_white,k_means_labels,"kmeans","baseline")
-        #TSNE.tsne_plot(images_black_and_white,spectral_labels,"spectral","baseline")
+        TSNE.tsne_plot(images_black_and_white,train_labels,"baseline","baseline")
+        TSNE.tsne_plot(images_black_and_white,k_means_labels,"kmeans","baseline")
+        TSNE.tsne_plot(images_black_and_white,spectral_labels,"spectral","baseline")
+
+
+        #Visualize using PCA
+        PCA = PCAAlgo()
+        PCA.pca_fit(features)
+
+        PCA.pca_plot(images_black_and_white,train_labels,"pca"+"baseline","baseline")
+        PCA.pca_plot(images_black_and_white,k_means_labels,"pca"+"kmeans","baseline")
+        PCA.pca_plot(images_black_and_white,spectral_labels,"pca"+"spectral","baseline")

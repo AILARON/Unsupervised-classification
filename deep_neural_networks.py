@@ -180,8 +180,14 @@ def COAPNET(input_shape = (64,64,3), output_shape = 121, include_top = True):
 
     # apply (CONV => BN layer => ReLU activation) + MaxPooling
     x = tf.keras.layers.Conv2D(512, (3, 3), padding="same" )(x)
-    #x = tf.keras.layers.BatchNormalization(axis=-1)(x)
-    #x = tf.keras.layers.Activation('relu')(x)
+    x = tf.keras.layers.BatchNormalization(axis=-1)(x)
+    x = tf.keras.layers.Activation('relu')(x)
+    x = tf.keras.layers.MaxPooling2D((2, 2), padding='same')(x)
+
+    # apply (CONV => BN layer => ReLU activation) + MaxPooling
+    x = tf.keras.layers.Conv2D(512, (3, 3), padding="same" )(x)
+    x = tf.keras.layers.BatchNormalization(axis=-1)(x)
+    x = tf.keras.layers.Activation('relu')(x)
     #x = tf.keras.layers.MaxPooling2D((2, 2), padding='same')(x)
 
     if include_top == False:

@@ -49,19 +49,22 @@ class Preprocessing():
     IMAGE_WIDTH = 64
     IMAGE_HEIGHT = 64
     IMAGE_DEPTH = 3
-    NUM_CLASSES = 200
+    NUM_CLASSES = 121
     AUTOENCODER = False
+    BATCH_SIZE = 32
 
     data = None
     label = None
 
 
-    def __init__(self, data, label,dataset='Kaggle', num_classes = 121,input_shape = (64,64,3), autoencoder = False):
+    def __init__(self, data, label,dataset='Kaggle', num_classes = 121,input_shape = (64,64,3), autoencoder = False, batch_size = 32):
             self.DATASET = dataset
             self.NUM_CLASSES = num_classes
             self.IMAGE_WIDTH = input_shape[0]
             self.IMAGE_HEIGHT = input_shape[1]
             self.AUTOENCODER = autoencoder
+            self.BATCH_SIZE = batch_size
+
             if dataset == 'Ailaron':
                 self.IMAGE_WIDTH = 64
                 self.IMAGE_HEIGHT = 64
@@ -119,7 +122,7 @@ class Preprocessing():
         gen = ImageDataGenerator.flow(
             self.data,
             y=self.label,
-            batch_size=32,
+            batch_size=self.BATCH_SIZE,
             shuffle=True,
             #sample_weight=None,
             #seed=None,
@@ -146,13 +149,13 @@ class Preprocessing():
         return self.data
 
     def returnTrainDataset(self):
-        return tf.data.Dataset.from_tensor_slices((self.data, self.label)).batch(32).shuffle(60000)
+        return tf.data.Dataset.from_tensor_slices((self.data, self.label)).batch(self.BATCH_SIZE).shuffle(60000)
 
     def returnDataset(self):
         if tf.__version__== '1.15.0':
             return self.data
 
-        return tf.data.Dataset.from_tensor_slices((self.data, self.label)).batch(32)
+        return tf.data.Dataset.from_tensor_slices((self.data, self.label)).batch(self.BATCH_SIZE)
 
     def updateLabels(self,label):
         self.label = label
@@ -207,13 +210,13 @@ class PreprocessingFromDataframe(Preprocessing):
         df=pd.read_csv(filename)
         self.NUM_CLASSES = len(df.label.unique())
 
-        train_generator= self.predictgen.flow_from_dataframe(dataframe=df, directory="", x_col="id", y_col="label", class_mode="categorical",
+        predict_generator= self.predictgen.flow_from_dataframe(dataframe=df, directory="", x_col="id", y_col="label", class_mode="categorical",
         target_size=(self.IMAGE_WIDTH,self.IMAGE_HEIGHT), batch_size=32, shuffle=False, color_mode='rgb', interpolation = "bilinear")
 
 
         # Wrap the generator with tf.data
         ds = tf.data.Dataset.from_generator(
-            lambda: train_generator,
+            lambda: predict_generator,
             output_types=(tf.float32, tf.float32),
             output_shapes = ([None, self.IMAGE_WIDTH,self.IMAGE_HEIGHT,3],[None,self.NUM_CLASSES])
         )
@@ -226,7 +229,7 @@ class PreprocessingFromDataframe(Preprocessing):
         self.NUM_CLASSES = len(df.label.unique())
 
         train_generator=self.traingen.flow_from_dataframe(dataframe=df, directory="", x_col="id", y_col="label", class_mode="categorical",
-        target_size=(self.IMAGE_WIDTH,self.IMAGE_HEIGHT), batch_size=32, shuffle =True, color_mode='rgb', interpolation = "bilinear")
+        target_size=(self.IMAGE_WIDTH,self.IMAGE_HEIGHT), batch_size=32, shuffle =True, color_mode='rgb', interpolation = "bilinear",save_to_dir = 'test',save_format = 'png')
 
         # Wrap the generator with tf.data
         ds = tf.data.Dataset.from_generator(
@@ -235,6 +238,9 @@ class PreprocessingFromDataframe(Preprocessing):
             output_shapes = ([None, self.IMAGE_WIDTH,self.IMAGE_HEIGHT,3],[None,self.NUM_CLASSES])
         )
         return ds
+
+    def returnGenerator(self):
+        return self.predictgen, self.traingen
 
     def returnImages(self, filename = ""):
         import pandas as pd
