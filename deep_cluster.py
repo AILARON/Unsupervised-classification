@@ -31,33 +31,42 @@ from clustering import preprocess_features
 from clustering_algorithms import * #TSNEAlgo, PCAAlgo, KMeansCluster, SpectralCluster, ClusterAlgorithm
 from utils import accuracy, confusion_matrix
 from deep_neural_networks import VGG_BATCHNORM, RESNET101,RESNET50, COAPNET, RESNET, BOF_MODELS
-from load_dataset import importWHOI, importKaggle
+from load_dataset import importWHOI, importKaggle,importAilaron
+
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+
+from neural_network_utils import *
 
 #CSV load files
-KAGGLE_TRAIN = 'csvloadfiles/kaggle_original.csv'
+KAGGLE_TRAIN = 'csvloadfiles/kaggle_original_train.csv'
 KAGGLE_TEST = 'csvloadfiles/kaggle_five_classes.csv'
 KAGGLE_MISSING = 'csvloadfiles/kaggle_missing.csv'
 KAGGLE_MISSING_TEST = 'csvloadfiles/kaggle_missing_five.csv'
+
+AILARON_TRAIN = 'csvloadfiles/ailaron_original.csv'
+AILARON_TEST = 'csvloadfiles/ailaron_test.csv'
 
 class DeepCluster:
     data_x = None
     data_y = None
     data_y_last = None
-    epochs = 35
+    epochs = 2
 
-    NUM_CLUSTER = 200
+    NUM_CLUSTER = 20
     input_shape = (64,64,3)
     verbose = 1
 
     def __init__(self):
         #self.data_x = importWHOI()
-        self.data_x, self.data_y = importKaggle(train=True)
+        self.data_x, self.data_y = importAilaron(train=True)
         #discard labels
-        self.data_y = tf.keras.utils.to_categorical(self.data_y, num_classes=121, dtype='float32')
+        self.data_y = tf.keras.utils.to_categorical(self.data_y, num_classes=7, dtype='float32')
         #self.data_x = x
         #self.data_y = y
 
-    def train(self,arch = 1, initialize_previous = False, imagefile = KAGGLE_TRAIN,name = 0):
+    def train(self,arch = 1, initialize_previous = False, imagefile = AILARON_TRAIN,name = 0):
         network_archs = ["coapnet","vgg","resnet"]
         network = network_archs[arch]
 
@@ -66,14 +75,17 @@ class DeepCluster:
         if network == "vgg":
             if initialize_previous == True:
                 model = VGG_BATCHNORM(input_shape=self.input_shape,output_shape = self.NUM_CLUSTER)
+                os.chdir("VGG-Full")
+
                 model = loadWeights(model,name)
+                os.chdir("../")
             else:
                 model = VGG_BATCHNORM(input_shape=self.input_shape,output_shape = self.NUM_CLUSTER)
 
         if network == "coapnet":
             if initialize_previous == True:
                 model = COAPNET(input_shape=self.input_shape,output_shape = self.NUM_CLUSTER)
-                model = loadWeights(model)
+                model = loadWeights(model,name)
             else:
                 model = COAPNET(input_shape=self.input_shape,output_shape = self.NUM_CLUSTER)
 
@@ -81,7 +93,7 @@ class DeepCluster:
             if initialize_previous == True:
 
                 model = RESNET50(input_shape=self.input_shape,output_shape = self.NUM_CLUSTER)
-                model = loadWeights(model)
+                model = loadWeights(model,name)
             else:
                 model = RESNET50(input_shape=self.input_shape,output_shape = self.NUM_CLUSTER)
 
@@ -167,10 +179,10 @@ class DeepCluster:
                 self.data_y_last = train_labels.copy()
 
                 # Update labels
-                updatecsvfile(imagefile,"deep_cluster_output.csv",train_labels)
+                updatecsvfile(imagefile,"deep_cluster_ailaron.csv",train_labels)
 
                 # Make augmented training set
-                train_dataset = preprocess_training.createPreprocessedAugmentedDataset(filename = "deep_cluster_output.csv")
+                train_dataset = preprocess_training.createPreprocessedAugmentedDataset(filename = "deep_cluster_ailaron.csv")
 
                 # Add clasification layer and compile model
                 if network == "resnet":
@@ -220,9 +232,9 @@ class DeepCluster:
 
         ##### Get results #####
 
-        validate_dataset = preprocess_training.createPreprocessedDataset(filename = KAGGLE_MISSING)
-        validate_labels = preprocess_training.returnLabels(filename = KAGGLE_MISSING)
-        validate_data = preprocess_training.returnImages(filename = KAGGLE_MISSING)
+        validate_dataset = preprocess_training.createPreprocessedDataset(filename = AILARON_TEST)
+        validate_labels = preprocess_training.returnLabels(filename = AILARON_TEST)
+        validate_data = preprocess_training.returnImages(filename = AILARON_TEST)
 
 
         if network == "resnet":
@@ -237,6 +249,11 @@ class DeepCluster:
         # Extract features
         features = compute_features(validate_dataset, model,validate_data.shape[0])
 
+        # PCA reduce features
+        #from sklearn.decomposition import PCA
+        #features = StandardScaler().fit_transform(features)
+        #features = PCA(n_components=512,copy=True, svd_solver='auto',iterated_power='auto').fit_transform(features)
+
         if self.verbose == 1:
             print(features, features.shape,features.dtype)
 
@@ -248,7 +265,7 @@ class DeepCluster:
 
         #Predict using K-means
         print("KMEANS CLUSTERING")
-        kmean = KMeansCluster(n_clusters = 108)
+        kmean = KMeansCluster(n_clusters = 7)
         kmean.fit(features)
         k_means_labels = sortLabels(validate_labels,kmean.predict(features))
         kmean.performance(validate_labels,k_means_labels)
@@ -257,7 +274,7 @@ class DeepCluster:
 
         print("SPECTRAL CLUSTERING")
         #Predict using SpectralClustering
-        spectral = SpectralCluster(n_clusters = 108)
+        spectral = SpectralCluster(n_clusters = 7)
         spectral_labels  = sortLabels(validate_labels,spectral.predict(features))
         spectral.performance(validate_labels,spectral_labels)
 
@@ -267,34 +284,6 @@ class DeepCluster:
         #Move back to prev dir
         #os.chdir("../")
         ##### Get results #####
-
-        validate_dataset = preprocess_training.createPreprocessedDataset(filename = KAGGLE_TRAIN)
-        validate_labels = preprocess_training.returnLabels(filename = KAGGLE_TRAIN)
-        validate_data = preprocess_training.returnImages(filename = KAGGLE_TRAIN)
-
-        #os.chdir(str("deepcluster_"+network_archs[arch]))
-        # Extract features
-        features = compute_features(validate_dataset, model,validate_data.shape[0])
-
-        #Predict using K-means
-        print("KMEANS CLUSTERING")
-        kmean = KMeansCluster(n_clusters = 121)
-        kmean.fit(features)
-        k_means_labels = sortLabels(validate_labels,kmean.predict(features))
-        kmean.performance(validate_labels,k_means_labels)
-
-        print("NMI new vs true = ", normalized_mutual_info_score(validate_labels,k_means_labels))
-
-        print("SPECTRAL CLUSTERING")
-        #Predict using SpectralClustering
-        spectral = SpectralCluster(n_clusters = 121)
-        spectral_labels  = sortLabels(validate_labels,spectral.predict(features))
-        spectral.performance(validate_labels,spectral_labels)
-
-        print("NMI new vs true = ", normalized_mutual_info_score(validate_labels,spectral_labels))
-
-
-
 
         '''
         print("BIRCH CLUSTERING")
@@ -317,7 +306,7 @@ class DeepCluster:
         gaussian_labels  = sortLabels(validate_labels,gaussian.predict(features))
         gaussian.performance(validate_labels,gaussian_labels)
 
-
+        '''
         #Visualize using TSNE
         TSNE = TSNEAlgo()
         TSNE.tsne_fit(features,perplexity = 35)
@@ -338,7 +327,7 @@ class DeepCluster:
         PCA.pca_plot(validate_data,k_means_labels,"pca"+str(network)+"kmeans","baseline")
         PCA.pca_plot(validate_data,spectral_labels,"pca"+str(network)+"spectral","baseline")
 
-        '''
+
 
         #Move back to prev dir
         #os.chdir("../")
@@ -359,7 +348,7 @@ class Logger(object):
         with open(os.path.join(self.path), 'wb') as fp:
             pickle.dump(self.data, fp, -1)
 
-
+"""
 def saveWeights(model,name):
     # Save JSON config to disk
     json_config = model.to_json()
@@ -377,7 +366,7 @@ def loadWeights(model,name):
         print("Could not load weights")
 
     return model
-
+"""
 def sortLabels(y_true,y_pred):
     print(y_pred.shape)
     #from sklearn.utils.linear_assignment_ import linear_assignment

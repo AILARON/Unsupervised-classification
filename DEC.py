@@ -14,6 +14,8 @@ from sklearn.cluster import KMeans
 import metrics
 import numpy as np
 import tensorflow as tf
+from neural_network_utils import *
+
 
 class ClusteringLayer(Layer):
     """
@@ -89,24 +91,36 @@ class DeepEmbeddedClustering:
 
     data = None
     labels = None
-    encoder =None
-    auto_encoder = None
+    model =None
+
+    train_generator = None
+    predict_generator = None
+
+    predict_dataset =  None
+    train_dataset= None
 
 
-    def __init__(self,auto_encoder,encoder, data,labels, n_clusters):
+    def __init__(self,model, data,labels, n_clusters,predict_generator,train_generator):
         """
         Initialize DEC algorithm
-        Input: 1. auto_encoder is a prebuilt model
-        Input: 2. encoder is a prebuilt model
-        Input: 3. data
-        Input: 4. labels
-        Input: 5. n_clusters define how many classes in the data set
+        Input: 1. model is a prebuilt neural network model
+        Input: 2. data
+        Input: 3. labels
+        Input: 4. n_clusters define how many classes in the data set
         """
-        self.encoder = encoder
-        self.auto_encoder = auto_encoder
+        self.model = model
         self.data = data
         self.n_clusters = n_clusters
         self.labels = labels
+
+        self.predict_generator = predict_generator
+        self.train_generator = train_generator
+
+        self.predict_dataset = tf.keras.preprocessing.image.NumpyArrayIterator(
+        self.data, self.labels, self.predict_generator, batch_size=32)
+
+        self.train_dataset = tf.keras.preprocessing.image.NumpyArrayIterator(
+        self.data, self.labels, self.train_generator, batch_size=32)
 
         return
 
@@ -116,33 +130,41 @@ class DeepEmbeddedClustering:
         """
         #Make model:
         #pooling = BoF_Pooling(128,spatial_level=1, name="BOF")(enc.get_layer("conv2d_8").output)
-        clustering_layer = ClusteringLayer(self.n_clusters, name='clustering')(self.encoder.output)
-        self.DEC = Model(inputs=self.encoder.input,
-                           outputs=[clustering_layer, self.auto_encoder.output])
+        clustering_layer = ClusteringLayer(self.n_clusters, name='clustering')(self.model.output)
+        self.DEC = tf.keras.Model(inputs=self.model.input,
+                           outputs=clustering_layer)
+        #compile model
+        optimizer = tf.keras.optimizers.SGD(learning_rate=0.0001, momentum=0.01, nesterov=False)
+        #pretrain_optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+        self.DEC.compile(loss=['kld'], optimizer=optimizer)
 
+        print('Build model finished')
+        return
+
+    def initializeClusteringLayer(self):
         #initialize clustering layer
-        kmeans = KMeans(n_clusters=self.n_clusters, n_init=20)
-        self.y_pred = kmeans.fit_predict(self.encoder.predict(self.data))
+        kmeans = KMeans(n_clusters=self.n_clusters, n_init=1000)
+        self.y_pred = kmeans.fit_predict(compute_features(self.predict_dataset,self.model,3772))
         self.DEC.get_layer(name='clustering').set_weights([kmeans.cluster_centers_])
         self.y_pred_last = np.copy(self.y_pred)
 
         #compile model
         optimizer = tf.keras.optimizers.SGD(learning_rate=0.0001, momentum=0.01, nesterov=False)
         #pretrain_optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
-        self.DEC.compile(loss=['kld', 'mse'], loss_weights=[0.1, 1], optimizer=optimizer)
-
+        self.DEC.compile(loss=['kld'], optimizer=optimizer)
         return
 
     def trainModel(self):
         """
         TrainModel trains the network
         """
-
+        print('train model ')
         loss = 0
         index = 0
-        maxiter = 20000
-        update_interval = 140
-        index_array = np.arange(self.data.shape[0])
+        maxiter = 40000
+        update_interval = 1
+        ##################### CHANGE THIS VALUE TO SHAPE ################# and change the one under!!
+        index_array = np.arange(3772)#self.data.shape[0]
         tol = 0.00001 # tolerance threshold to stop training
         batch_size = 32
         y_pred = self.y_pred
@@ -156,7 +178,7 @@ class DeepEmbeddedClustering:
 
         for ite in range(int(maxiter)):
             if ite % update_interval == 0:
-                q, _  = self.DEC.predict(self.data, verbose=0)
+                q  = compute_features(self.predict_dataset,self.DEC,3772) #self.DEC.predict(self.data)#, steps = 5)#self.DEC.predict(self.dataset, steps = 118) #compute_features(self.data,self.DEC,3772) #self.DEC.predict(self.data)#, steps = 5)
                 p = target_distribution(q)  # update the auxiliary target distribution p
 
                 # evaluate the clustering performance
@@ -176,27 +198,43 @@ class DeepEmbeddedClustering:
                     print('delta_label ', delta_label, '< tol ', tol)
                     print('Reached tolerance threshold. Stopping training.')
                     break
-            idx = index_array[index * batch_size: min((index+1) * batch_size, self.data.shape[0])]
-            loss = self.DEC.train_on_batch(x=self.data[idx], y=[p[idx], self.data[idx]])
-            index = index + 1 if (index + 1) * batch_size <= self.data.shape[0] else 0
 
+
+                #self.train_dataset = tf.keras.preprocessing.image.NumpyArrayIterator(
+                #    self.data, p, self.train_generator, batch_size=32, shuffle = True)
+                self.train_dataset = tf.keras.preprocessing.image.NumpyArrayIterator(
+                   self.data, p, self.predict_generator, batch_size=32, shuffle = True)
+
+
+
+            print('debug')
+            for i, (data, label) in enumerate(self.train_dataset):
+                loss = self.DEC.train_on_batch(x=data, y=label)
+
+                if i == 118:
+                    break
+    def saveModel(self,name):
+        saveWeights(self.DEC,name)
+
+    def loadModel(self,name):
+        loadWeights(self.DEC,name)
 
     def getModel(self):
         """
         Returns dec model
         """
-        return self.DEC, self.encoder
+        return self.DEC
 
 
     def evaluateDEC(self):
         # Eval.
-        q, _ = self.model.predict(x, verbose=0)
-        p = target_distribution(q)  # update the auxiliary target distribution p
+        y = self.labels
+        q = compute_features(self.predict_dataset,self.DEC,3772)
+        #p = target_distribution(q)  # update the auxiliary target distribution p
         # evaluate the clustering performance
         y_pred = q.argmax(1)
         if y is not None:
             acc = np.round(metrics.acc(y, y_pred), 5)
             nmi = np.round(metrics.nmi(y, y_pred), 5)
             ari = np.round(metrics.ari(y, y_pred), 5)
-            loss = np.round(loss, 5)
-            print('Acc = %.5f, nmi = %.5f, ari = %.5f' % (acc, nmi, ari), ' ; loss=', loss)
+            print('Acc = %.5f, nmi = %.5f, ari = %.5f' % (acc, nmi, ari))

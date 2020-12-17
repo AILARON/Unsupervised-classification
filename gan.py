@@ -81,35 +81,30 @@ class GAN():
 
     def make_generator_model(self):
         model = tf.keras.Sequential(name='generator')
-        model.add(layers.Dense(8*8*256, use_bias=False, input_shape=(100,)))
+        model.add(layers.Dense(4*4*512, use_bias=False, input_shape=(100,)))
         model.add(layers.BatchNormalization())
         model.add(layers.LeakyReLU())
 
-        model.add(layers.Reshape((8, 8, 256)))
-        assert model.output_shape == (None, 8, 8, 256) # Note: None is the batch size
+        model.add(layers.Reshape((4, 4, 512)))
+        assert model.output_shape == (None, 4, 4, 512) # Note: None is the batch siz
 
-        model.add(layers.Conv2DTranspose(128, (5, 5), strides=(1, 1), padding='same', use_bias=False))
-        assert model.output_shape == (None, 8, 8, 128)
+        model.add(layers.Conv2DTranspose(512, (5, 5), strides=(2, 2), padding='same', use_bias=False))
+        assert model.output_shape == (None, 8, 8, 512)
+        model.add(layers.BatchNormalization())
+        model.add(layers.LeakyReLU())
+
+        model.add(layers.Conv2DTranspose(256, (5, 5), strides=(2, 2), padding='same', use_bias=False))
+        assert model.output_shape == (None, 16, 16, 256)
         model.add(layers.BatchNormalization())
         model.add(layers.LeakyReLU())
 
         model.add(layers.Conv2DTranspose(128, (5, 5), strides=(2, 2), padding='same', use_bias=False))
-        assert model.output_shape == (None, 16, 16, 128)
+        assert model.output_shape == (None, 32, 32, 128)
         model.add(layers.BatchNormalization())
         model.add(layers.LeakyReLU())
 
-        model.add(layers.Conv2DTranspose(128, (5, 5), strides=(1, 1), padding='same', use_bias=False))
-        assert model.output_shape == (None, 16, 16, 128)
-        model.add(layers.BatchNormalization())
-        model.add(layers.LeakyReLU())
-
-        model.add(layers.Conv2DTranspose(256, (5, 5), strides=(2, 2), padding='same', use_bias=False))
-        assert model.output_shape == (None, 32, 32, 256)
-        model.add(layers.BatchNormalization())
-        model.add(layers.LeakyReLU())
-
-        model.add(layers.Conv2DTranspose(256, (5, 5), strides=(2, 2), padding='same', use_bias=False))
-        assert model.output_shape == (None, 64, 64, 256)
+        model.add(layers.Conv2DTranspose(64, (5, 5), strides=(2, 2), padding='same', use_bias=False))
+        assert model.output_shape == (None, 64, 64, 64)
         model.add(layers.BatchNormalization())
         model.add(layers.LeakyReLU())
 
@@ -122,30 +117,34 @@ class GAN():
         model = tf.keras.Sequential( name='discriminator')
         model.add(layers.Conv2D(64, (5, 5), strides=(2, 2), padding='same',
                                          input_shape=[64, 64, 3]))
+        model.add(layers.BatchNormalization())
         model.add(layers.LeakyReLU())
         model.add(layers.Dropout(0.3))
 
         model.add(layers.Conv2D(128, (5, 5), strides=(2, 2), padding='same'))
         model.add(layers.LeakyReLU())
+        model.add(layers.BatchNormalization())
         model.add(layers.Dropout(0.3))
+
 
         model.add(layers.Conv2D(256, (5, 5), strides=(2, 2), padding='same'))
         model.add(layers.LeakyReLU())
+        model.add(layers.BatchNormalization())
         model.add(layers.Dropout(0.3))
 
         model.add(layers.Conv2D(512, (5, 5), strides=(2, 2), padding='same'))
         model.add(layers.LeakyReLU())
+        model.add(layers.BatchNormalization())
         model.add(layers.Dropout(0.3))
 
-        model.add(layers.GlobalAveragePooling2D())
-        #model.add(layers.Flatten())
+        #model.add(layers.GlobalAveragePooling2D())
+        model.add(layers.Flatten())
 
         model.add(layers.Dense(256))
         model.add(layers.LeakyReLU())
         model.add(layers.Dropout(0.3))
 
         model.add(layers.Dense(1))
-
         return model
 
 
@@ -173,15 +172,17 @@ class GAN():
             generator_optimizer.apply_gradients(zip(gradients_of_generator, generator.trainable_variables))
             discriminator_optimizer.apply_gradients(zip(gradients_of_discriminator, discriminator.trainable_variables))
 
+            return gen_loss, disc_loss
+
         #model_wrapper = wrapper()
         for epoch in range(epochs):
 
             start = time.time()
 
-            for image_batch, labels in dataset:
-                train_step(image_batch, generator,generator_optimizer, discriminator,discriminator_optimizer)
-
-
+            for i, (image_batch, labels) in enumerate (dataset):
+                gen_loss, disc_loss = train_step(image_batch, generator,generator_optimizer, discriminator,discriminator_optimizer)
+                if i >= 30336//32:
+                    break
             if epoch % 10 == 0:
 
                 self.generate_and_save_images(generator,
@@ -189,6 +190,7 @@ class GAN():
                                      self.seed)
 
             print ('Time for epoch {} is {} sec'.format(epoch + 1, time.time()-start))
+            print('Loss value: ', float(gen_loss), 'Disc value: ', float(disc_loss))
 
     def generate_and_save_images(self,model, epoch, test_input):
 
@@ -209,11 +211,13 @@ class GAN():
         ##### Load training data #####
         train_data, _ = importKaggle(train=True)
         labels = np.zeros(train_data.shape[0])
+        labels = tf.keras.utils.to_categorical(labels, num_classes=121, dtype='float32')
         ##### Preprocessing #####
 
         preprocess_training = Preprocessing(train_data,labels,dataset='Kaggle',
-         num_classes = self.NUM_CLUSTER,input_shape = self.input_shape)
-        train_dataset = preprocess_training.returnTrainDataset()
+         num_classes = self.NUM_CLUSTER,input_shape = self.input_shape,batch_size = 32)
+        #train_dataset = preprocess_training.returnTrainDataset()
+        train_dataset = preprocess_training.returnAugmentedDataset()
 
         #make model
         generator = self.make_generator_model()
@@ -221,11 +225,11 @@ class GAN():
         print(discriminator.summary())
         print(generator.summary())
 
-        generator_optimizer = tf.keras.optimizers.Adam(1e-4)
-        discriminator_optimizer = tf.keras.optimizers.Adam(1e-4)
+        generator_optimizer = tf.keras.optimizers.Adam(1e-4,beta_1=0.5)
+        discriminator_optimizer = tf.keras.optimizers.Adam(1e-4,beta_1=0.5)
 
 
-        self.train(train_dataset, 50, generator,generator_optimizer, discriminator,discriminator_optimizer)
+        self.train(train_dataset, 100, generator,generator_optimizer, discriminator,discriminator_optimizer)
         saveWeights(discriminator,"discriminator")
         saveWeights(generator,"generator")
 
@@ -244,6 +248,10 @@ class GAN():
         images = np.array([cv2.resize(img, dsize=(64,64), interpolation=cv2.INTER_LINEAR) for img in (val_data)])
         features = compute_features(validate_dataset, discriminator_pred,val_data.shape[0])
 
+        #test overfitting
+        generator = self.make_generator_model()
+        loadWeights(generator,"generator")
+        doesImageExist(preprocess.returnImages(),generator)
 
         #Predict using K-means
         print("KMEANS CLUSTERING")
@@ -285,7 +293,7 @@ class GAN():
 
 def doesImageExist(data,model):
 
-    data_np = data.reshape(-1,64*64)
+    data_np = data.reshape(-1,64*64*3)
     print(data_np.shape)
 
 
@@ -294,13 +302,13 @@ def doesImageExist(data,model):
     print(predictions.shape)
 
     pred_np = predictions.numpy()
-    pred_np = pred_np.reshape(-1,64*64)
+    pred_np = pred_np.reshape(-1,64*64*3)
     print(pred_np.shape)
 
 
 
     from sklearn.neighbors import DistanceMetric
-    dist = DistanceMetric.get_metric('manhattan')
+    dist = DistanceMetric.get_metric('euclidean')
     array = dist.pairwise(pred_np, Y=data_np)
     print(array.shape)
     index = np.zeros(16)
@@ -328,7 +336,3 @@ def doesImageExist(data,model):
         plt.axis('off')
 
     plt.savefig('similar.png')
-
-
-
-    sys.exit()

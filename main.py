@@ -27,19 +27,20 @@ if gpu == 0:
 if gpu == 1:
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
     print("physical_devices-------------", len(physical_devices))
-    tf.config.experimental.set_visible_devices(physical_devices[0], 'GPU')
+    tf.config.experimental.set_visible_devices(physical_devices[1], 'GPU')
 
-    tf.config.experimental.set_memory_growth(physical_devices[0], True)
+    tf.config.experimental.set_memory_growth(physical_devices[1], True)
     #tf.config.experimental.set_memory_growth(physical_devices[1], True)
 
+print(tf.__version__)
 
 if __name__=="__main__":
     tf.keras.backend.clear_session()
 
     from load_dataset import createCSVFile, checkCSVFile
 
-    #createCSVFile('kaggle_five_classes','kaggle_five_classes_missing',drop_class = True)
-    #checkCSVFile(kaggle_missing)
+    #createCSVFile('ailaron_small','ailaron_test',drop_class = False)
+    #checkCSVFile('ailaron_original')
     #os.exit()
 
     from gradcam import grad
@@ -53,11 +54,26 @@ if __name__=="__main__":
     from traditional_extraction import traditionalExtraction
     from get_dataset_info import data_info
     from size_experiment import network
-
+    from classification import ClusterModels
     #grad()
     #sys.exit()
 
-    model = "DC"
+    model = "classification"
+
+    if model == "classification":
+        print(tf.__version__)
+        #if tf.__version__ == '1.15.0':
+        #    ClusterModels().dec(model = 'auto',train = False)
+
+        #else:
+        #    ClusterModels().dec(model = 'DC',train = False)
+
+        print(tf.__version__)
+        if tf.__version__ == '1.15.0':
+            from rot_inv_autoencoder import RotationInvariantAutoencoder
+            ClusterModels().testAuto()
+        else:
+            ClusterModels().testDC()
 
     if model == "rotation_invariant":
         from rot_inv_autoencoder import RotationInvariantAutoencoder
@@ -76,12 +92,15 @@ if __name__=="__main__":
 
     if model == "neuralNetwork":
         neuralNetwork(1)
+        #for i in range(3):
+        #    neuralNetwork(i)
 
     if model == "network":
         network()
 
     if model == "DC":
         for i in range(5):
+        #from test import DeepCluster
             DeepCluster().train(1, initialize_previous = False,name = i)
 
     if model == "gan":

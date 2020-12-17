@@ -29,22 +29,26 @@ def network():
     train_data, test_data, train_label, test_label = train_test_split(train_data, train_labels, test_size=0.1)
 
     for i in range(20):
-        shape = (40+20*i,40+20*i,3)
-        model = VGG_BATCHNORM(input_shape=shape,output_shape = 121)
+        train(i, train_data, test_data, train_label, test_label)
 
-        optimizer = tf.keras.optimizers.SGD(learning_rate=0.001, momentum=0.9, nesterov=False)
-        model.compile(optimizer=optimizer, loss=tf.keras.losses.CategoricalCrossentropy(), metrics=['accuracy'])
+def train(i, train_data, test_data, train_label, test_label):
+    shape = (160+20*i,160+20*i,3)
+    model = VGG_BATCHNORM(input_shape=shape,output_shape = 121)
 
-        # Preprocess data
-        train_dataset = Preprocessing(train_data, train_label,image_width = shape[0], image_height = shape[1]).returnAugmentedDataset()
-        test_dataset = Preprocessing(test_data, test_label,image_width = shape[0], image_height = shape[1]).returnDataset()
+    optimizer = tf.keras.optimizers.SGD(learning_rate=0.001, momentum=0.9, nesterov=False)
+    model.compile(optimizer=optimizer, loss=tf.keras.losses.CategoricalCrossentropy(), metrics=['accuracy'])
 
-        #Early stopping criterion
-        stopping = tf.keras.callbacks.EarlyStopping(
-        monitor='val_loss', min_delta=0.01, patience=30, verbose=1, mode='auto',
-        baseline=None, restore_best_weights=False)
+    # Preprocess data
+    train_dataset = Preprocessing(train_data, train_label,input_shape = shape).returnAugmentedDataset()
+    test_dataset = Preprocessing(test_data, test_label,input_shape = shape).returnDataset()
 
-        history = model.fit(train_dataset,validation_data =test_dataset, steps_per_epoch= train_data.shape[0] // 32,
-        validation_steps= test_data.shape[0] // 32, verbose = 0, callbacks =[stopping], epochs = 30)
+    #Early stopping criterion
+    stopping = tf.keras.callbacks.EarlyStopping(
+    monitor='val_loss', min_delta=0.01, patience=30, verbose=1, mode='auto',
+    baseline=None, restore_best_weights=False)
 
-        print(i,':   ',history.history['loss'][29],history.history['val_loss'][29],history.history['accuracy'][29],history.history['val_accuracy'][29])
+    history = model.fit(train_dataset,validation_data =test_dataset, steps_per_epoch= train_data.shape[0] // 32,
+    validation_steps= test_data.shape[0] // 32, verbose = 0, callbacks =[stopping], epochs = 30)
+
+    print(160+20*i,':   ',history.history['loss'][29],history.history['val_loss'][29],history.history['accuracy'][29],history.history['val_accuracy'][29])
+    return

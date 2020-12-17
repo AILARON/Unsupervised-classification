@@ -22,8 +22,8 @@ WHOI_ORIGINAL_TRAIN_2014 = "dataset/WHOI/2014/"
 WHOI_ORIGINAL_TRAIN_2013 = "dataset/WHOI/2013/"
 LUOTRAINING = "dataset/Luo_Training/"
 PASTORETRAINING ="dataset/Pastore_Training"
-AILARONTRAINING = "dataset/Ailaron_Training"
-AILARONTEST = "dataset/Ailaron_Test"
+AILARONTRAINING = "dataset/ailaron_big"
+AILARONTEST = "dataset/ailaron_small"
 
 DATA_FORMAT = ["jpg","png"]
 
@@ -49,8 +49,10 @@ def importPastoreTraining():
 def importAilaron(train = True):
     if train:
         loader = LoadDatasetTIFF(AILARONTRAINING)
+        return loader.load_data(AILARONTRAINING)
     else:
         loader = LoadDatasetTIFF(AILARONTEST)
+        return loader.load_data(AILARONTEST)
     return loader.load_data()
 
 def importKaggleOld(train=True):
@@ -182,10 +184,10 @@ class LoadDatasetTIFF():
 
     SAVE = False
 
-    def __init__(self,data_dir,height = 64,width = 64, depth =1 ):
+    def __init__(self,data_dir,height = 64,width = 64, depth =3 ):
         self.data_dir = pathlib.Path(data_dir)
 
-        if (data_dir.find('Ailaron') != -1):
+        if (data_dir.find('ailaron') != -1):
             self.IMAGE_COUNT = len(list(self.data_dir.glob('*/*.tiff')))
 
         else:
@@ -198,8 +200,8 @@ class LoadDatasetTIFF():
         print("found ",self.CLASS_NAMES," classes")
 
         self.list_ds = tf.data.Dataset.list_files(str(self.data_dir/'*/*'))
-        self.CONFIGURE_FOR_PERFORMANCE = configure_for_performance
-        self.TEST_SIZE = test_size
+        #self.CONFIGURE_FOR_PERFORMANCE = configure_for_performance
+        #self.TEST_SIZE = test_size
         self.IMG_HEIGHT = height
         self.IMG_WIDTH = width
         self.IMG_DEPTH = depth
@@ -368,11 +370,11 @@ def createCSVFile(filename,output_filename,drop_class = False):
     import glob
     import csv
 
-    print(pathlib.Path("dataset/"+filename+"/").glob('*/*.jpg'))
+    print(pathlib.Path("dataset/"+filename+"/").glob('*/*.tiff'))
 
     # Returns a list of names in list files.
     print("Using glob.glob()")
-    files = glob.glob("dataset/"+filename+"//**/*.jpg",
+    files = glob.glob("dataset/"+filename+"//**/*.tiff",
                        recursive = True)
 
     filepath = pathlib.Path("dataset/"+filename+"/")
